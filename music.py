@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import random
 import subprocess
 import sys
 from collections import deque
@@ -371,6 +372,56 @@ def setup_music_commands(bot):
             or "Queue بەتاڵە."
         )
         await interaction.response.send_message(text[:4000])
+
+    @bot.tree.command(name="shuffle", description="تێکەڵکردنی queue")
+    async def shuffle(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        q = bot.music.queues.get(gid, deque())
+        if len(q) < 2:
+            return await interaction.response.send_message(
+                "❌ بۆ shuffle ـکردن کەمتر لە ٢ گۆرانی لە queue ـە.",
+                ephemeral=True,
+            )
+        items = list(q)
+        random.shuffle(items)
+        bot.music.queues[gid] = deque(items)
+        await interaction.response.send_message("🔀 Queue تێکەڵکرا.")
+
+    @bot.tree.command(name="nowplaying", description="پیشاندانی گۆرانیی ئێستا")
+    async def nowplaying(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        cur = bot.music.current.get(gid)
+        if not cur:
+            return await interaction.response.send_message(
+                "❌ هیچ گۆرانییەک لە پەخشکردندا نییە.",
+                ephemeral=True,
+            )
+        await interaction.response.send_message(
+            f"🎶 ئێستا: **{cur.title}**\n🔗 {cur.webpage}"
+        )
+
+    @bot.tree.command(name="clearqueue", description="پاککردنەوەی queue بەبێ وەستاندنی گۆرانیی ئێستا")
+    async def clearqueue(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        bot.music.queues[gid] = deque()
+        await interaction.response.send_message("🧹 Queue پاککرایەوە.")
+
+    @bot.tree.command(name="remove", description="لابردنی دانەیەک لە queue")
+    @app_commands.describe(position="ژمارەی گۆرانی لە queue")
+    async def remove(interaction: discord.Interaction, position: int):
+        gid = interaction.guild.id
+        q = bot.music.queues.get(gid, deque())
+        if position < 1 or position > len(q):
+            return await interaction.response.send_message(
+                "❌ ژمارەی queue هەڵەیە.",
+                ephemeral=True,
+            )
+        items = list(q)
+        removed = items.pop(position - 1)
+        bot.music.queues[gid] = deque(items)
+        await interaction.response.send_message(
+            f"🗑️ **{removed.title}** لە queue لابرا."
+        )
 
     @bot.tree.command(name="volume", description="گۆڕینی دەنگ")
     @app_commands.describe(value="0-100")

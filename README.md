@@ -20,3 +20,13 @@ FFmpeg, PyNaCl, and davey are required for music/voice playback and are installe
 ## Commands
 Moderation, anti-spam/link protection, tickets, warnings, XP/rank, polls, giveaways, music,
 server/user tools, and utility commands are implemented in Python modules.
+
+
+## Slash + Prefix control
+- Slash commands use `/command`.
+- Prefix aliases use `$command` (or the value of `PREFIX`).
+- `REGISTER_COMMANDS=false` is the safe Railway default and prevents global sync on every restart.
+- After the bot is online, run `$sync` once in your Discord server as an Administrator. This registers the slash commands to that server immediately.
+- `$syncglobal` is OWNER_ID-only and should only be used when a global sync is actually needed.
+- Music supports YouTube, Spotify (resolved through spotDL), TikTok/other yt-dlp-supported URLs, queue controls, shuffle, skip, volume, loop, now playing, and clear/remove queue.
+- Anti-spam is enabled by default for new servers; administrators can use `/antispam` or `$antispam` to change it.

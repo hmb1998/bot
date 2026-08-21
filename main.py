@@ -7,6 +7,7 @@ import re
 import inspect
 import shlex
 from collections import defaultdict, deque
+from datetime import timedelta
 from pathlib import Path
 from threading import Thread
 
@@ -40,7 +41,7 @@ PORT = int(os.getenv("PORT", "3000"))
 OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
 
 REGISTER_COMMANDS = (
-    os.getenv("REGISTER_COMMANDS", "true").lower() == "true"
+    os.getenv("REGISTER_COMMANDS", "false").lower() == "true"
 )
 
 
@@ -523,6 +524,54 @@ def _register_prefix_commands(bot):
         )
 
 
+
+# =========================================================
+# SAFE COMMAND SYNC
+# =========================================================
+
+def _sync_command_handlers(bot):
+    """Add low-risk prefix controls for slash-command registration."""
+    if bot.get_command("sync"):
+        return
+
+    @bot.command(name="sync")
+    @commands.has_permissions(administrator=True)
+    async def sync_current_guild(ctx):
+        """Sync slash commands to this server without a global rate-limit burst."""
+        if not ctx.guild:
+            return await ctx.send("❌ ئەم فرمانە تەنها لە سێروەر کاردەکات.")
+
+        try:
+            synced = await bot.tree.sync(guild=ctx.guild)
+            await ctx.send(
+                f"✅ **{len(synced)}** Slash Command بۆ **{ctx.guild.name}** تۆمارکرا.\n"
+                "ئێستا دەتوانیت `/` بنووسیت و command ـەکان ببینیت."
+            )
+        except discord.HTTPException as exc:
+            retry = getattr(exc, "retry_after", None)
+            extra = f" ⏳ دووبارە هەوڵ بدەرەوە دوای {retry:.1f}s." if retry else ""
+            await ctx.send(f"❌ Sync سەرکەوتوو نەبوو.{extra}")
+
+    @bot.command(name="syncglobal")
+    async def sync_global(ctx):
+        """Owner-only explicit global sync."""
+        if OWNER_ID and ctx.author.id != OWNER_ID:
+            return await ctx.send("❌ تەنها خاوەن بۆتەکە دەتوانێت global sync بکات.")
+        if not OWNER_ID or ctx.author.id != OWNER_ID:
+            return await ctx.send("❌ OWNER_ID لە Railway Variables دانەنراوە.")
+
+        try:
+            synced = await bot.tree.sync()
+            await ctx.send(
+                f"✅ **{len(synced)}** Slash Command بە شێوەی global sync کرا.\n"
+                "لە Discord ـدا بڵاوبوونەوەی global command لەوانەیە کەمێک کات بخایەنێت."
+            )
+        except discord.HTTPException as exc:
+            retry = getattr(exc, "retry_after", None)
+            extra = f" ⏳ دووبارە هەوڵ بدەرەوە دوای {retry:.1f}s." if retry else ""
+            await ctx.send(f"❌ Global sync سەرکەوتوو نەبوو.{extra}")
+
+
 # =========================================================
 # HMB GLOBAL BOT
 # =========================================================
@@ -539,9 +588,10 @@ class HMBGlobal(commands.Bot):
 
         self.music = MusicManager(self)
 
-        self.spam = defaultdict(
-            deque
-        )
+        self.spam = defaultdict(deque)
+        self.spam_last_text = {}
+        self.spam_repeats = defaultdict(int)
+        self.spam_triggered_until = {}
 
         self.started = time.time()
 
@@ -565,24 +615,18 @@ class HMBGlobal(commands.Bot):
 
         # Register $ commands
         _register_prefix_commands(self)
+        _sync_command_handlers(self)
 
-        # Register slash commands
+        # Global slash-command sync is OFF by default to avoid Discord 429
+        # rate limits during Railway restarts. Use $sync in a server to
+        # register commands to that server immediately, or explicitly set
+        # REGISTER_COMMANDS=true when you intentionally want a global sync.
         if REGISTER_COMMANDS:
-
             try:
-
                 synced = await self.tree.sync()
-
-                log.info(
-                    "Registered %d Python slash commands",
-                    len(synced)
-                )
-
+                log.info("Registered %d global slash commands", len(synced))
             except Exception:
-
-                log.exception(
-                    "Slash command registration failed"
-                )
+                log.exception("Global slash command registration failed")
 
     # =====================================================
     # READY
@@ -623,11 +667,14 @@ class HMBGlobal(commands.Bot):
         error
     ):
 
-        if isinstance(
-            error,
-            commands.CommandNotFound
-        ):
+        if isinstance(error, commands.CommandNotFound):
+            return
 
+        if isinstance(error, commands.MissingPermissions):
+            try:
+                await ctx.send("❌ ڕێگەت پێنەدراوە.")
+            except Exception:
+                pass
             return
 
         log.exception(
@@ -777,60 +824,80 @@ async def on_message(
             return
 
     # =====================================================
-    # ANTISPAM
+    # STRONG ANTISPAM
     # =====================================================
 
-    if bot.store.get_bool(
-        message.guild.id,
-        "antispam"
-    ):
-
-        if not message.author.guild_permissions.administrator:
-
-            key = (
-                message.guild.id,
-                message.author.id
-            )
-
+    if bot.store.get_bool(message.guild.id, "antispam"):
+        if not (
+            message.author.guild_permissions.administrator
+            or message.author.guild_permissions.manage_messages
+        ):
+            key = (message.guild.id, message.author.id)
             now = time.monotonic()
-
             q = bot.spam[key]
-
             q.append(now)
-
             while q and now - q[0] > 7:
-
                 q.popleft()
 
-            # Strong burst protection: 5/7 is the first threshold; the
-            # extra listener in features.py handles duplicates, mention floods
-            # and content floods as a second layer.
-            if len(q) >= 5:
+            normalized = " ".join(message.content.lower().split())[:400]
+            if normalized and normalized == bot.spam_last_text.get(key):
+                bot.spam_repeats[key] += 1
+            else:
+                bot.spam_repeats[key] = 1
+                bot.spam_last_text[key] = normalized
 
+            mention_flood = len(message.mentions) + len(message.role_mentions) >= 5
+            fast_burst = len(q) >= 5
+            duplicate_flood = bot.spam_repeats[key] >= 3
+            long_flood = len(message.content) >= 1800
+            triggered = fast_burst or duplicate_flood or mention_flood or long_flood
+
+            if triggered and now >= bot.spam_triggered_until.get(key, 0):
+                bot.spam_triggered_until[key] = now + 600
+
+                # Delete the triggering message first.
                 try:
                     await message.delete()
                 except discord.HTTPException:
                     pass
 
-                # Escalate repeated bursts to a short timeout when the bot
-                # has Moderate Members permission.
-                if len(q) >= 8:
-                    try:
-                        await message.author.timeout(
-                            discord.utils.utcnow() + __import__("datetime").timedelta(seconds=60),
-                            reason="HMB GLOBAL anti-spam burst"
-                        )
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
+                # Delete the offender's messages from this channel.
+                # discord.py uses bulk deletion where Discord permits it and
+                # falls back to individual deletion for older messages.
+                try:
+                    deleted = await message.channel.purge(
+                        limit=None,
+                        check=lambda m: m.author.id == message.author.id,
+                        bulk=True,
+                        reason="HMB GLOBAL anti-spam cleanup",
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    deleted = []
+
+                # 10-minute timeout.
+                timeout_ok = False
+                try:
+                    await message.author.timeout(
+                        discord.utils.utcnow() + timedelta(minutes=10),
+                        reason="HMB GLOBAL anti-spam: 10 minute timeout",
+                    )
+                    timeout_ok = True
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
 
                 try:
                     await message.channel.send(
-                        f"🛡️ <@{message.author.id}> تکایە سپام مەکە.",
-                        delete_after=5
+                        f"🛡️ **Anti-Spam چالاک بوو**\n"
+                        f"👤 {message.author.mention}\n"
+                        f"🗑️ **{len(deleted)}** پەیامی ئەم کەسە لەم کەناڵە سڕایەوە.\n"
+                        f"🔇 Timeout: **10 خولەک** {'✅' if timeout_ok else '⚠️'}",
+                        delete_after=8,
                     )
                 except discord.HTTPException:
                     pass
 
+                bot.spam[key].clear()
+                bot.spam_repeats[key] = 0
                 return
 
     # =====================================================
