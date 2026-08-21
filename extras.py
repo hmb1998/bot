@@ -203,9 +203,15 @@ class HMBControlView(discord.ui.View):
 
 
 def setup_extra_commands(bot):
+    # FIX: setup_hook must be safe if Discord calls it more than once.
+    # Without this guard, commands such as /remove are registered twice and
+    # discord.py raises CommandAlreadyRegistered during login.
+    if getattr(bot, "_hmb_extra_commands_registered", False):
+        return
+    bot._hmb_extra_commands_registered = True
+
     @bot.tree.command(name="ascii",description="گۆڕینی دەق بۆ ASCII")
     async def ascii_cmd(interaction: discord.Interaction,text: str):
-        # No external ASCII package: safe boxed text.
         out="\n".join(f"│ {c}" for c in text[:30])
         await interaction.response.send_message(f"```text\n┌────────────┐\n{out}\n└────────────┘\n```")
 
@@ -260,7 +266,6 @@ def setup_extra_commands(bot):
 
     @bot.event
     async def on_message_xp(message):
-        # Kept as a named helper; main on_message can be extended without a second event.
         return
 
     @bot.tree.command(name="poll",description="دروستکردنی راپرسی")
@@ -300,7 +305,7 @@ def setup_extra_commands(bot):
     @app_commands.checks.has_permissions(administrator=True)
     async def setlogs(interaction: discord.Interaction,channel: discord.TextChannel):
         bot.store.set(interaction.guild.id,"logs_channel",channel.id)
-        await interaction.response.send_message(f"✅ Logs = {channel.mention}",ephemeral=True)
+        await interaction.response.send_message(f"✅ Logs = {channel.mention}")
 
     @bot.tree.command(name="debug",description="پشکنینی دۆخی بۆت")
     async def debug(interaction: discord.Interaction):
@@ -357,7 +362,7 @@ def setup_extra_commands(bot):
 
     @bot.tree.command(name="quiz",description="یاری پرسیار و وەڵام")
     async def quiz(interaction: discord.Interaction):
-        questions=[("پایتختی عێراق چییە؟","baghdad"),("2+2 چەندە؟","4"),("Python چییە؟","programming language")]
+        questions=[("پایتەختی عێراق چییە؟","baghdad"),("2+2 چەندە؟","4"),("Python چییە؟","programming language")]
         q,a=random.choice(questions)
         await interaction.response.send_message(f"🧠 **Quiz:** {q}\nوەڵام: ||{a}||")
 
