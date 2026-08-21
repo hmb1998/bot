@@ -10,10 +10,12 @@ Set `TOKEN` in Railway Variables, then start with:
 python main.py
 ```
 
-Optional variables: `OWNER_ID`, `PREFIX` (default `$`), `REGISTER_COMMANDS` (default `true`), `PORT`.
+Optional variables: `OWNER_ID`, `PREFIX` (default `$`), `REGISTER_COMMANDS` (default `false`), `PORT`.
+
+`REGISTER_COMMANDS=false` avoids Discord global-command rate limits during frequent Railway restarts. Use the `$refresh` command (administrator) to copy/sync all slash commands to the current server, or set `REGISTER_COMMANDS=true` only when you specifically need a global sync.
 
 The bot stores settings, warnings, and XP in `hmb.sqlite3` using Python's built-in `sqlite3`.
-FFmpeg is required for music playback and is installed by the included Dockerfile.
+FFmpeg, PyNaCl, and davey are required for music/voice playback and are installed by the included Dockerfile and requirements.
 
 ## Commands
 Moderation, anti-spam/link protection, tickets, warnings, XP/rank, polls, giveaways, music,

@@ -1,116 +1,289 @@
-import asyncio, os, re, logging, discord
+import asyncio
+import logging
 from collections import deque
-import yt_dlp
-from discord.ext import commands
-from discord import app_commands
 
-YDL_OPTS={'format':'bestaudio/best','noplaylist':True,'quiet':True,'default_search':'ytsearch1','extract_flat':False}
-FFMPEG_OPTS={'before_options':'-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options':'-vn'}
+import discord
+from discord import app_commands
+import yt_dlp
+
+
+YDL_OPTS = {
+    "format": "bestaudio/best",
+    "noplaylist": True,
+    "quiet": True,
+    "default_search": "ytsearch1",
+    "extract_flat": False,
+}
+
+FFMPEG_OPTS = {
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn",
+}
+
 
 class Track:
-    def __init__(self,title,url,webpage=None): self.title=title; self.url=url; self.webpage=webpage or url
+    def __init__(self, title, url, webpage=None):
+        self.title = title
+        self.url = url
+        self.webpage = webpage or url
+
 
 class MusicManager:
-    def __init__(self,bot): self.bot=bot; self.queues={}; self.current={}; self.voice={}; self.loop={}
-    async def extract(self,query):
-        loop=asyncio.get_running_loop()
+    def __init__(self, bot):
+        self.bot = bot
+        self.queues = {}
+        self.current = {}
+        self.voice = {}
+        self.loop = {}
+        self.volume = {}
+        self.skip_once = set()
+
+    async def extract(self, query):
+        loop = asyncio.get_running_loop()
+
         def work():
             with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
-                info=ydl.extract_info(query,download=False)
-                if 'entries' in info: info=next(iter(info['entries']))
-                return Track(info.get('title',query),info.get('url') or info.get('webpage_url'),info.get('webpage_url'))
-        return await loop.run_in_executor(None,work)
-    async def ensure_voice(self,interaction):
-        if not interaction.guild: return None
-        vc=interaction.guild.voice_client
-        target=interaction.user.voice.channel if interaction.user.voice else None
-        if not target: return None
-        if vc and vc.channel!=target: await vc.move_to(target)
-        elif not vc: vc=await target.connect()
-        self.voice[interaction.guild.id]=vc; return vc
-    async def play_next(self,guild_id):
-        vc=self.voice.get(guild_id)
-        q=self.queues.setdefault(guild_id,deque())
-        current=self.current.get(guild_id)
+                info = ydl.extract_info(query, download=False)
+                if not info:
+                    raise RuntimeError("هیچ ئەنجامێک نەدۆزرایەوە.")
+                if "entries" in info:
+                    info = next((entry for entry in info["entries"] if entry), None)
+                if not info:
+                    raise RuntimeError("هیچ گۆرانییەک نەدۆزرایەوە.")
 
-        if not vc:
+                url = info.get("url") or info.get("webpage_url")
+                if not url:
+                    raise RuntimeError("لینکی دەنگی گۆرانی نەدۆزرایەوە.")
+
+                return Track(
+                    info.get("title", query),
+                    url,
+                    info.get("webpage_url"),
+                )
+
+        return await loop.run_in_executor(None, work)
+
+    async def ensure_voice(self, interaction):
+        if not interaction.guild:
+            return None
+
+        target = interaction.user.voice.channel if interaction.user.voice else None
+        if not target:
+            return None
+
+        vc = interaction.guild.voice_client
+        if vc and vc.is_connected():
+            if vc.channel != target:
+                await vc.move_to(target)
+        else:
+            vc = await target.connect()
+
+        self.voice[interaction.guild.id] = vc
+        return vc
+
+    async def play_next(self, guild_id):
+        vc = self.voice.get(guild_id)
+        queue = self.queues.setdefault(guild_id, deque())
+        current = self.current.get(guild_id)
+
+        if not vc or not vc.is_connected():
             return
 
-        # Loop the current track when enabled; otherwise take the next queued track.
+        skip_this_track = guild_id in self.skip_once
+        if skip_this_track:
+            self.skip_once.discard(guild_id)
+            current = None
+            self.current.pop(guild_id, None)
+
         if self.loop.get(guild_id) and current:
-            track=current
-        elif q:
-            track=q.popleft()
-            self.current[guild_id]=track
+            track = current
+        elif queue:
+            track = queue.popleft()
+            self.current[guild_id] = track
         else:
             self.current.pop(guild_id, None)
             return
 
-        def after(err):
-            if err:
-                logging.getLogger("HMB_GLOBAL").error("FFmpeg playback error: %s", err)
-            asyncio.run_coroutine_threadsafe(
+        def after(error):
+            if error:
+                logging.getLogger("HMB_GLOBAL").error(
+                    "FFmpeg playback error: %s", error
+                )
+            future = asyncio.run_coroutine_threadsafe(
                 self.play_next(guild_id), self.bot.loop
             )
+            try:
+                future.result(timeout=0)
+            except Exception:
+                pass
 
-        source=discord.FFmpegPCMAudio(track.url,**FFMPEG_OPTS)
-        vc.play(source,after=after)
+        source = discord.FFmpegPCMAudio(track.url, **FFMPEG_OPTS)
+        source = discord.PCMVolumeTransformer(
+            source,
+            volume=self.volume.get(guild_id, 1.0),
+        )
+        vc.play(source, after=after)
 
 
 def setup_music_commands(bot):
-    @bot.tree.command(name='play',description='لێدانی گۆرانی بە ناونیشان یان لینک')
-    @app_commands.describe(song='ناوی گۆرانی یان لینکی یوتیوب')
-    async def play(interaction:discord.Interaction,song:str):
-        vc=await bot.music.ensure_voice(interaction)
-        if not vc: return await interaction.response.send_message('❌ تکایە سەرەتا بچۆ ناو کەناڵێکی دەنگییەوە.',ephemeral=True)
-        await interaction.response.defer()
+    @bot.tree.command(
+        name="play",
+        description="لێدانی گۆرانی بە ناونیشان یان لینک",
+    )
+    @app_commands.describe(song="ناوی گۆرانی یان لینکی یوتیوب")
+    async def play(interaction: discord.Interaction, song: str):
         try:
-            track=await bot.music.extract(song); bot.music.queues.setdefault(interaction.guild.id,deque()).append(track)
-            if not vc.is_playing(): await bot.music.play_next(interaction.guild.id)
-            await interaction.followup.send(f'🎵 دەنگپەخشکرا: **{track.title}**')
-        except Exception as e: await interaction.followup.send(f'❌ نەتوانرا گۆرانی پەخش بکرێت. `{e}`',ephemeral=True)
+            vc = await bot.music.ensure_voice(interaction)
+            if not vc:
+                return await interaction.response.send_message(
+                    "❌ تکایە سەرەتا بچۆ ناو کەناڵێکی دەنگییەوە.",
+                    ephemeral=True,
+                )
 
-    @bot.tree.command(name='join',description='چوونە ناو voice channel')
+            await interaction.response.defer()
+            track = await bot.music.extract(song)
+            queue = bot.music.queues.setdefault(
+                interaction.guild.id, deque()
+            )
+            queue.append(track)
+
+            if not vc.is_playing() and not vc.is_paused():
+                await bot.music.play_next(interaction.guild.id)
+
+            await interaction.followup.send(
+                f"🎵 دانرا بۆ پەخشکردن: **{track.title}**"
+            )
+        except Exception as e:
+            logging.getLogger("HMB_GLOBAL").exception("Play command failed")
+            message = str(e).replace("`", "'")[:500]
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    f"❌ نەتوانرا گۆرانی پەخش بکرێت.\n`{message}`",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"❌ نەتوانرا گۆرانی پەخش بکرێت.\n`{message}`",
+                    ephemeral=True,
+                )
+
+    @bot.tree.command(name="join", description="چوونە ناو voice channel")
     async def join(interaction: discord.Interaction):
-        vc=await bot.music.ensure_voice(interaction); await interaction.response.send_message('✅ پەیوەندی بە voice کرا.' if vc else '❌ لە voice channel نییت.',ephemeral=True)
-    @bot.tree.command(name='leave',description='دەرچوون لە voice channel')
-    async def leave(interaction: discord.Interaction):
-        vc=interaction.guild.voice_client if interaction.guild else None
-        if vc: await vc.disconnect(force=True)
-        bot.music.voice.pop(interaction.guild.id,None); await interaction.response.send_message('👋 دەرچووم لە voice.')
-    @bot.tree.command(name='pause',description='وەستاندنی گۆرانی')
-    async def pause(interaction: discord.Interaction):
-        vc=interaction.guild.voice_client if interaction.guild else None
-        if vc and vc.is_playing(): vc.pause(); return await interaction.response.send_message('⏸️ وەستێنرا.')
-        await interaction.response.send_message('❌ هیچ گۆرانییەک لە پەخشکردندا نییە.',ephemeral=True)
-    @bot.tree.command(name='resume',description='دەستپێکردنەوەی گۆرانی')
-    async def resume(interaction: discord.Interaction):
-        vc=interaction.guild.voice_client if interaction.guild else None
-        if vc and vc.is_paused(): vc.resume(); return await interaction.response.send_message('▶️ بەردەوام بوو.')
-        await interaction.response.send_message('❌ گۆرانی وەستاندراو نییە.',ephemeral=True)
-    @bot.tree.command(name='skip',description='تێپەڕاندنی گۆرانی')
-    async def skip(interaction: discord.Interaction):
-        vc=interaction.guild.voice_client if interaction.guild else None
-        if vc and (vc.is_playing() or vc.is_paused()): vc.stop(); return await interaction.response.send_message('⏭️ Skip کرا.')
-        await interaction.response.send_message('❌ هیچ گۆرانییەک نییە.',ephemeral=True)
-    @bot.tree.command(name='stop',description='وەستاندن و پاککردنەوەی queue')
-    async def stop(interaction: discord.Interaction):
-        vc=interaction.guild.voice_client if interaction.guild else None
-        if vc: vc.stop()
-        bot.music.queues[interaction.guild.id]=deque(); await interaction.response.send_message('⏹️ پەخشکردن و queue وەستاندرا.')
-    @bot.tree.command(name='queue',description='بینینی queue')
-    async def queue(interaction: discord.Interaction):
-        q=bot.music.queues.get(interaction.guild.id,deque()); cur=bot.music.current.get(interaction.guild.id)
-        text=f'🎵 ئێستا: **{cur.title}**\n' if cur else ''
-        text+='\n'.join(f'{i+1}. {x.title}' for i,x in enumerate(q)) or 'Queue بەتاڵە.'
-        await interaction.response.send_message(text[:4000])
-    @bot.tree.command(name='volume',description='گۆڕینی دەنگ')
-    @app_commands.describe(value='0-100')
-    async def volume(interaction,value:int):
-        if not 0<=value<=100: return await interaction.response.send_message('❌ ژمارەکە دەبێت 0 تا 100 بێت.',ephemeral=True)
-        await interaction.response.send_message(f'🔊 Volume بۆ {value}% دانرا. (FFmpeg source ـی ئێستا بەبێ restart volume control ـی ناوخۆیی نییە.)',ephemeral=True)
-    @bot.tree.command(name='loop',description='دووبارەکردنەوەی گۆرانی')
-    async def loop(interaction: discord.Interaction):
-        gid=interaction.guild.id; bot.music.loop[gid]=not bot.music.loop.get(gid,False); await interaction.response.send_message(f"🔁 Loop: {'ON' if bot.music.loop[gid] else 'OFF'}")
+        try:
+            vc = await bot.music.ensure_voice(interaction)
+        except Exception as e:
+            return await interaction.response.send_message(
+                f"❌ پەیوەندی بە voice نەکرا: `{str(e)[:500]}`",
+                ephemeral=True,
+            )
+        await interaction.response.send_message(
+            "✅ پەیوەندی بە voice کرا."
+            if vc
+            else "❌ لە voice channel نییت.",
+            ephemeral=True,
+        )
 
-# commands are installed from main setup
+    @bot.tree.command(name="leave", description="دەرچوون لە voice channel")
+    async def leave(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        vc = interaction.guild.voice_client if interaction.guild else None
+        bot.music.loop[gid] = False
+        bot.music.queues[gid] = deque()
+        bot.music.current.pop(gid, None)
+        bot.music.skip_once.discard(gid)
+        if vc:
+            await vc.disconnect(force=True)
+        bot.music.voice.pop(gid, None)
+        await interaction.response.send_message("👋 دەرچووم لە voice.")
+
+    @bot.tree.command(name="pause", description="وەستاندنی گۆرانی")
+    async def pause(interaction: discord.Interaction):
+        vc = interaction.guild.voice_client if interaction.guild else None
+        if vc and vc.is_playing():
+            vc.pause()
+            return await interaction.response.send_message("⏸️ وەستێنرا.")
+        await interaction.response.send_message(
+            "❌ هیچ گۆرانییەک لە پەخشکردندا نییە.",
+            ephemeral=True,
+        )
+
+    @bot.tree.command(name="resume", description="دەستپێکردنەوەی گۆرانی")
+    async def resume(interaction: discord.Interaction):
+        vc = interaction.guild.voice_client if interaction.guild else None
+        if vc and vc.is_paused():
+            vc.resume()
+            return await interaction.response.send_message("▶️ بەردەوام بوو.")
+        await interaction.response.send_message(
+            "❌ گۆرانی وەستاندراو نییە.",
+            ephemeral=True,
+        )
+
+    @bot.tree.command(name="skip", description="تێپەڕاندنی گۆرانی")
+    async def skip(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        vc = interaction.guild.voice_client if interaction.guild else None
+        if vc and (vc.is_playing() or vc.is_paused()):
+            bot.music.skip_once.add(gid)
+            vc.stop()
+            return await interaction.response.send_message("⏭️ Skip کرا.")
+        await interaction.response.send_message(
+            "❌ هیچ گۆرانییەک نییە.",
+            ephemeral=True,
+        )
+
+    @bot.tree.command(
+        name="stop",
+        description="وەستاندن و پاککردنەوەی queue",
+    )
+    async def stop(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        vc = interaction.guild.voice_client if interaction.guild else None
+        bot.music.loop[gid] = False
+        bot.music.skip_once.discard(gid)
+        bot.music.current.pop(gid, None)
+        bot.music.queues[gid] = deque()
+        if vc:
+            vc.stop()
+        await interaction.response.send_message(
+            "⏹️ پەخشکردن و queue وەستاندرا."
+        )
+
+    @bot.tree.command(name="queue", description="بینینی queue")
+    async def queue(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        q = bot.music.queues.get(gid, deque())
+        cur = bot.music.current.get(gid)
+        text = f"🎵 ئێستا: **{cur.title}**\n" if cur else ""
+        text += (
+            "\n".join(f"{i + 1}. {x.title}" for i, x in enumerate(q))
+            or "Queue بەتاڵە."
+        )
+        await interaction.response.send_message(text[:4000])
+
+    @bot.tree.command(name="volume", description="گۆڕینی دەنگ")
+    @app_commands.describe(value="0-100")
+    async def volume(interaction: discord.Interaction, value: int):
+        if not 0 <= value <= 100:
+            return await interaction.response.send_message(
+                "❌ ژمارەکە دەبێت 0 تا 100 بێت.",
+                ephemeral=True,
+            )
+
+        gid = interaction.guild.id
+        bot.music.volume[gid] = value / 100
+
+        vc = interaction.guild.voice_client
+        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+            vc.source.volume = value / 100
+
+        await interaction.response.send_message(
+            f"🔊 Volume بۆ **{value}%** دانرا."
+        )
+
+    @bot.tree.command(name="loop", description="دووبارەکردنەوەی گۆرانی")
+    async def loop(interaction: discord.Interaction):
+        gid = interaction.guild.id
+        bot.music.loop[gid] = not bot.music.loop.get(gid, False)
+        await interaction.response.send_message(
+            f"🔁 Loop: {'ON' if bot.music.loop[gid] else 'OFF'}"
+        )

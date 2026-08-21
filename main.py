@@ -33,14 +33,14 @@ BASE = Path(__file__).parent
 
 TOKEN = os.getenv("TOKEN", "").strip()
 
-PREFIX = "$"
+PREFIX = os.getenv("PREFIX", "$").strip() or "$"
 
 PORT = int(os.getenv("PORT", "3000"))
 
 OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
 
 REGISTER_COMMANDS = (
-    os.getenv("REGISTER_COMMANDS", "true").lower() == "true"
+    os.getenv("REGISTER_COMMANDS", "false").lower() == "true"
 )
 
 
@@ -67,6 +67,8 @@ intents.message_content = True
 
 # Required for member events / member based features
 intents.members = True
+# Required for voice channel connections / music playback
+intents.voice_states = True
 
 
 # =========================================================
