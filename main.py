@@ -4,6 +4,8 @@ import asyncio
 import logging
 import random
 import re
+import inspect
+import shlex
 from collections import defaultdict, deque
 from pathlib import Path
 from threading import Thread
@@ -29,15 +31,165 @@ OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
 REGISTER_COMMANDS = os.getenv("REGISTER_COMMANDS", "true").lower() == "true"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-log = logging.getLogger("HMB_GLOBAL")
 
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.message_content = True
-intents.messages = True
-intents.voice_states = True
-intents.reactions = True
+class _PrefixResponse:
+    def __init__(self, interaction):
+        self.interaction = interaction
+        self._done = False
+        self._message = None
+
+    def is_done(self):
+        return self._done
+
+    async def send_message(self, content=None, *, ephemeral=False, **kwargs):
+        self._done = True
+        self._message = await self.interaction.channel.send(content or "", **{
+            k: v for k, v in kwargs.items()
+            if k in ("embed", "embeds", "file", "files", "view", "allowed_mentions")
+        })
+        return self._message
+
+    async def defer(self, *, ephemeral=False, **kwargs):
+        self._done = True
+
+
+class _PrefixFollowup:
+    def __init__(self, interaction):
+        self.interaction = interaction
+
+    async def send(self, content=None, *, ephemeral=False, **kwargs):
+        return await self.interaction.channel.send(content or "", **{
+            k: v for k, v in kwargs.items()
+            if k in ("embed", "embeds", "file", "files", "view", "allowed_mentions")
+        })
+
+
+class _PrefixInteraction:
+    """Small Interaction-compatible adapter so the existing Python commands
+    can be called from $prefix messages without duplicating every command."""
+    def __init__(self, message, bot):
+        self.message = message
+        self.client = bot
+        self.guild = message.guild
+        self.channel = message.channel
+        self.user = message.author
+        self.guild_id = message.guild.id if message.guild else None
+        self.channel_id = message.channel.id if message.channel else None
+        self.response = _PrefixResponse(self)
+        self.followup = _PrefixFollowup(self)
+        self.command = None
+
+    @property
+    def permissions(self):
+        return self.user.guild_permissions if self.guild else discord.Permissions.none()
+
+    async def original_response(self):
+        return self.response._message
+
+
+async def _prefix_convert(ctx, raw, annotation):
+    if annotation is int:
+        return int(raw)
+    if annotation is discord.Member:
+        return await commands.MemberConverter().convert(ctx, raw)
+    if annotation is discord.User:
+        return await commands.UserConverter().convert(ctx, raw)
+    if annotation is discord.Role:
+        return await commands.RoleConverter().convert(ctx, raw)
+    if annotation is discord.TextChannel:
+        return await commands.TextChannelConverter().convert(ctx, raw)
+    return raw
+
+
+async def _prefix_arguments(ctx, callback, raw):
+    sig = inspect.signature(callback)
+    params = list(sig.parameters.values())[1:]  # skip interaction
+    tokens = shlex.split(raw) if raw else []
+    values = {}
+    pos = 0
+
+    for i, p in enumerate(params):
+        ann = p.annotation
+        has_default = p.default is not inspect.Parameter.empty
+        remaining = len(tokens) - pos
+
+        if remaining <= 0:
+            if has_default:
+                values[p.name] = p.default
+                continue
+            raise ValueError(f"❌ بۆ `${ctx.invoked_with}` پێویستە `{p.name}` بنووسیت.")
+
+        # A string parameter consumes the rest, except when a later parameter
+        # still needs a token (e.g. $giveaway prize 3).
+        if ann is str:
+            later_required = sum(
+                1 for q in params[i+1:]
+                if q.default is inspect.Parameter.empty
+            )
+            take = max(1, remaining - later_required)
+            # If all later parameters are optional, keep all remaining text.
+            if later_required == 0:
+                take = remaining
+            raw_value = " ".join(tokens[pos:pos+take])
+            pos += take
+        else:
+            raw_value = tokens[pos]
+            pos += 1
+
+        try:
+            values[p.name] = await _prefix_convert(ctx, raw_value, ann)
+        except Exception:
+            pretty = getattr(ann, "__name__", str(ann))
+            raise ValueError(f"❌ ناتوانم `{raw_value}` وەک {pretty} بناسم.")
+
+    if pos < len(tokens):
+        raise ValueError(f"❌ ژمارەی arguments زۆرە بۆ `${ctx.invoked_with}`.")
+
+    return values
+
+
+def _register_prefix_commands(bot):
+    """Expose every existing slash command with the configured $ prefix."""
+    for app_cmd in bot.tree.get_commands():
+        if not isinstance(app_cmd, app_commands.Command):
+            continue
+        name = app_cmd.name
+        if bot.get_command(name):
+            continue
+
+        def make_runner(_app_cmd, _name):
+            async def runner(ctx):
+                interaction = _PrefixInteraction(ctx.message, bot)
+                interaction.command = _app_cmd
+                try:
+                    # Reuse the same permission checks already attached to the
+                    # slash command, so $ commands are not weaker than / commands.
+                    for check in getattr(_app_cmd, "checks", []):
+                        result = check(interaction)
+                        if inspect.isawaitable(result):
+                            result = await result
+                        if not result:
+                            raise app_commands.CheckFailure("prefix permission check failed")
+
+                    raw = ctx.message.content[len(PREFIX) + len(_name):].strip()
+                    kwargs = await _prefix_arguments(ctx, _app_cmd.callback, raw)
+                    await _app_cmd.callback(interaction, **kwargs)
+                except app_commands.MissingPermissions:
+                    await ctx.send("❌ ڕێگەت پێنەدراوە.")
+                except app_commands.CheckFailure:
+                    await ctx.send("❌ ڕێگەت پێنەدراوە.")
+                except ValueError as e:
+                    await ctx.send(str(e))
+                except Exception as e:
+                    log.exception("Prefix command %s failed", _name, exc_info=e)
+                    await ctx.send("❌ هەڵەیەکی نەخوازراو ڕوویدا.")
+
+            runner.__name__ = f"prefix_{_name}"
+            runner.__doc__ = f"${_name} command"
+            return runner
+
+        bot.add_command(commands.Command(make_runner(app_cmd, name), name=name))
+
 
 class HMBGlobal(commands.Bot):
     def __init__(self):
@@ -52,6 +204,7 @@ class HMBGlobal(commands.Bot):
         setup_features(self)
         setup_music_commands(self)
         setup_extra_commands(self)
+        _register_prefix_commands(self)
         if REGISTER_COMMANDS:
             try:
                 synced = await self.tree.sync()
@@ -132,35 +285,6 @@ async def on_message(message: discord.Message):
                 pass
             return
 
-    if message.content.startswith(PREFIX):
-        parts = message.content[len(PREFIX):].strip().split(maxsplit=1)
-        if parts:
-            cmd = parts[0].lower()
-            arg = parts[1] if len(parts) > 1 else ""
-            if cmd == "ping":
-                await message.channel.send(f"🏓 Pong! API: {round(bot.latency * 1000)} ms")
-                return
-            if cmd == "help":
-                names = sorted(c.name for c in bot.tree.get_commands())
-                await message.channel.send(("📚 Commands:\n" + " • ".join(f"`{x}`" for x in names))[:4000])
-                return
-            if cmd == "uptime":
-                sec = int(time.time() - bot.started)
-                await message.channel.send(f"⏱️ {sec//3600}h {(sec%3600)//60}m {sec%60}s")
-                return
-            if cmd == "coinflip":
-                await message.channel.send(f"🪙 **{random.choice(['Heads', 'Tails'])}**")
-                return
-            if cmd == "roll":
-                try:
-                    mx = int(arg or "100")
-                except ValueError:
-                    mx = 100
-                await message.channel.send(f"🎲 {random.randint(1, max(1, min(mx, 100000)))}")
-                return
-            if cmd == "say" and message.author.guild_permissions.manage_messages and arg:
-                await message.channel.send(arg)
-                return
 
     await bot.process_commands(message)
 
