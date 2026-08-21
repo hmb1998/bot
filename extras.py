@@ -331,9 +331,9 @@ def setup_extra_commands(bot):
         await interaction.channel.set_permissions(user,view_channel=True,send_messages=True)
         await interaction.response.send_message(f"✅ {user.mention} زیادکرا.")
 
-    @bot.tree.command(name="remove",description="دەرکردنی ئەندام لە تیکێت")
+    @bot.tree.command(name="ticket-remove",description="دەرکردنی ئەندام لە تیکێت")
     @app_commands.checks.has_permissions(manage_channels=True)
-    async def remove(interaction: discord.Interaction,user: discord.Member):
+    async def ticket_remove(interaction: discord.Interaction,user: discord.Member):
         await interaction.channel.set_permissions(user,view_channel=False)
         await interaction.response.send_message(f"✅ {user.mention} لابرا.")
 
