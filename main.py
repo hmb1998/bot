@@ -25,7 +25,7 @@ from storage import Store
 load_dotenv()
 BASE = Path(__file__).parent
 TOKEN = os.getenv("TOKEN", "").strip()
-PREFIX = os.getenv("PREFIX", "$")
+PREFIX = "$"  # HMB GLOBAL prefix: use $ for all prefix commands
 PORT = int(os.getenv("PORT", "3000"))
 OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
 REGISTER_COMMANDS = os.getenv("REGISTER_COMMANDS", "true").lower() == "true"
@@ -185,7 +185,7 @@ def _register_prefix_commands(bot):
                     await ctx.send("❌ هەڵەیەکی نەخوازراو ڕوویدا.")
 
             runner.__name__ = f"prefix_{_name}"
-            runner.__doc__ = f"${_name} command"
+            runner.__doc__ = f"{PREFIX}{_name} command"
             return runner
 
         bot.add_command(commands.Command(make_runner(app_cmd, name), name=name))
