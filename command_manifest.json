@@ -1,0 +1,501 @@
+[
+  {
+    "name": "add",
+    "description": "زیادکردنی ئەندام بۆ ناو تیکێت",
+    "options": [
+      "user"
+    ],
+    "source": "commands/add.js"
+  },
+  {
+    "name": "antispam",
+    "description": "چالاککردن یان ناچالاککردنی سیستەمی دژە-سپام",
+    "options": [
+      "action"
+    ],
+    "source": "commands/antispam.js"
+  },
+  {
+    "name": "ascii",
+    "description": "گۆڕینی دەقی ئینگلیزی بۆ شێوازی ئەسکی ئاررت (ASCII Art)",
+    "options": [
+      "text"
+    ],
+    "source": "commands/ascii.js"
+  },
+  {
+    "name": "autorole",
+    "description": "ڕێکخستنی ڕۆڵی خۆکار بۆ ئەندامە نوێیەکان",
+    "options": [
+      "set",
+      "role",
+      "remove",
+      "status"
+    ],
+    "source": "commands/autorole.js"
+  },
+  {
+    "name": "avatar",
+    "description": "پیشاندانی وێنەی پڕۆفایلی خۆت یان ئەندامێکی تر",
+    "options": [
+      "user"
+    ],
+    "source": "commands/avatar.js"
+  },
+  {
+    "name": "azar",
+    "description": "مێنوی تایبەت بە گۆرانییەکانی ازهر الناطق و لێدانی ڕاستەوخۆ 🎵",
+    "options": [],
+    "source": "commands/azar.js"
+  },
+  {
+    "name": "ban",
+    "description": "قەدەغەکردنی ئەندامێک لە سێروەر",
+    "options": [
+      "user",
+      "reason"
+    ],
+    "source": "commands/ban.js"
+  },
+  {
+    "name": "banner",
+    "description": "پیشاندانی باوەری پڕۆفایلی (Banner) خۆت یان ئەندامێکی تر",
+    "options": [
+      "user"
+    ],
+    "source": "commands/banner.js"
+  },
+  {
+    "name": "botstats",
+    "description": "Show HMB GLOBAL statistics",
+    "options": [],
+    "source": "commands/botstats.js"
+  },
+  {
+    "name": "calculator",
+    "description": "ئەنجامدانی ژمێرکاری (پێویستە هاوکێشەکە بنووسیت)",
+    "options": [
+      "expression"
+    ],
+    "source": "commands/calculator.js"
+  },
+  {
+    "name": "clear",
+    "description": "سڕینەوەی چەند پەیامێک بەیەکجار لە چاتەکەدا",
+    "options": [
+      "count"
+    ],
+    "source": "commands/clear.js"
+  },
+  {
+    "name": "clearwarns",
+    "description": "سڕینەوەی هەموو ئاگادارکردنەوەکانی (Warning) ئەندامێک",
+    "options": [
+      "user"
+    ],
+    "source": "commands/clearwarns.js"
+  },
+  {
+    "name": "close",
+    "description": "داخستنی تیکێتەکە لەلایەن ستافەوە",
+    "options": [],
+    "source": "commands/close.js"
+  },
+  {
+    "name": "coinflip",
+    "description": "هەڵدانی دراو (سەر یان خاچ - Heads or Tails)",
+    "options": [],
+    "source": "commands/coinflip.js"
+  },
+  {
+    "name": "control",
+    "description": "تابلۆی جوان و پێشکەوتووی کۆنترۆڵی موزیک",
+    "options": [],
+    "source": "commands/control.js"
+  },
+  {
+    "name": "debug",
+    "description": "پشکنینی دۆخی پلەیر و کەناڵی دەنگی بۆت",
+    "options": [],
+    "source": "commands/debug.js"
+  },
+  {
+    "name": "giveaway",
+    "description": "بەڕێوەبردنی سەکۆی گیوەیدەکان (Giveaways)",
+    "options": [
+      "start",
+      "duration",
+      "winners",
+      "prize",
+      "channel",
+      "reroll",
+      "message_id",
+      "end"
+    ],
+    "source": "commands/giveaway.js"
+  },
+  {
+    "name": "help",
+    "description": "پیشاندانی پێڕستی سەرەکی یارمەتی و فەرمانەکان بە شێوازێکی پڕۆفیشناڵ",
+    "options": [],
+    "source": "commands/help.js"
+  },
+  {
+    "name": "invite",
+    "description": "دروستکردنی لینکی بانگێشتکردن بۆ سێروەرەکە",
+    "options": [],
+    "source": "commands/invite.js"
+  },
+  {
+    "name": "join",
+    "description": "هێنانی بۆت بۆ کەناڵی دەنگییەکەت",
+    "options": [],
+    "source": "commands/join.js"
+  },
+  {
+    "name": "kick",
+    "description": "دەرکردنی ئەندامێک لە سێروەر (Kick)",
+    "options": [
+      "user",
+      "reason"
+    ],
+    "source": "commands/kick.js"
+  },
+  {
+    "name": "link",
+    "description": "کۆنترۆڵکردنی پاراستنی لینکەکان",
+    "options": [
+      "action"
+    ],
+    "source": "commands/link.js"
+  },
+  {
+    "name": "lock",
+    "description": "قەفڵکردنی کەناڵی ئێستا بۆ ئەوەی ئەندامان نەتوانن نامە بنێرن",
+    "options": [],
+    "source": "commands/lock.js"
+  },
+  {
+    "name": "loop",
+    "description": "گۆڕینی دۆخی دووبارەکردنەوەی گۆرانی (Loop Mode)",
+    "options": [],
+    "source": "commands/loop.js"
+  },
+  {
+    "name": "mazensido",
+    "description": "مێنوی تایبەت بە گۆرانی و دبکەکانی مازن عەساف و ژانۆ سیدۆ 🎵",
+    "options": [],
+    "source": "commands/mazensido.js"
+  },
+  {
+    "name": "mute",
+    "description": "بێدەنگکردنی ئەندامێک (Timeout) بۆ ماوەی 10 خولەک",
+    "options": [
+      "user",
+      "reason"
+    ],
+    "source": "commands/mute.js"
+  },
+  {
+    "name": "nickname",
+    "description": "گۆڕینی ناوی خوازراوی (Nickname) ئەندامێک لە سێروەر",
+    "options": [
+      "user"
+    ],
+    "source": "commands/nickname.js"
+  },
+  {
+    "name": "nuke",
+    "description": "نۆککردنی کەناڵ (سڕینەوە و دروستکردنەوەی کەناڵەکە بە هەموو ڕێکخستنەکانییەوە)",
+    "options": [],
+    "source": "commands/nuke.js"
+  },
+  {
+    "name": "owner",
+    "description": "فەرمانەکانی خاوەنی بۆت",
+    "options": [
+      "action"
+    ],
+    "source": "commands/owner.js"
+  },
+  {
+    "name": "pause",
+    "description": "وەستاندنی کاتیی گۆرانی ئێستا",
+    "options": [],
+    "source": "commands/pause.js"
+  },
+  {
+    "name": "ping",
+    "description": "بۆ پشکنینی خێرایی و پەیوەندی بۆت",
+    "options": [],
+    "source": "commands/ping.js"
+  },
+  {
+    "name": "play",
+    "description": "لێدانی گۆرانی بە ناونیشان یان لینک",
+    "options": [
+      "song"
+    ],
+    "source": "commands/play.js"
+  },
+  {
+    "name": "poll",
+    "description": "دروستکردنی راپرسی (Poll) بۆ وەرگرتنی رای ئەندامان",
+    "options": [
+      "question"
+    ],
+    "source": "commands/poll.js"
+  },
+  {
+    "name": "purgebots",
+    "description": "سڕینەوەی نامەی بۆتەکان بە کۆمەڵ لە کەناڵدا",
+    "options": [
+      "amount"
+    ],
+    "source": "commands/purgebots.js"
+  },
+  {
+    "name": "purgehumans",
+    "description": "سڕینەوەی نامەی بەکارهێنەران (مرۆڤەکان) بە کۆمەڵ لە کەناڵدا",
+    "options": [
+      "amount"
+    ],
+    "source": "commands/purgehumans.js"
+  },
+  {
+    "name": "queue",
+    "description": "پیشاندانی لیستی گۆرانییە چاوەڕوانکراوەکان",
+    "options": [],
+    "source": "commands/queue.js"
+  },
+  {
+    "name": "quiz",
+    "description": "یاری پرسیار و وەڵام بە شێوازی بەردەوام (خاڵ و وەستان) 🧠",
+    "options": [],
+    "source": "commands/quiz.js"
+  },
+  {
+    "name": "rank",
+    "description": "پیشاندانی کارتەی زانیاری ئاست و ئەزموون (XP & Level)",
+    "options": [
+      "user"
+    ],
+    "source": "commands/rank.js"
+  },
+  {
+    "name": "refresh",
+    "description": "نوێکردنەوە و دووبارە تۆمارکردنی هەموو Slash Commands ـەکان",
+    "options": [],
+    "source": "commands/refresh.js"
+  },
+  {
+    "name": "remove",
+    "description": "دەرکردنی ئەندام لە تیکێت",
+    "options": [
+      "user"
+    ],
+    "source": "commands/remove.js"
+  },
+  {
+    "name": "removerole",
+    "description": "لابردنی رۆڵ لە ئەندامێک لە ناو سێروەردا",
+    "options": [
+      "user",
+      "role"
+    ],
+    "source": "commands/removerole.js"
+  },
+  {
+    "name": "resume",
+    "description": "بەردەوامبوون لە پەخشکردنی ئەو گۆرانییەی کە وەستێنرابوو",
+    "options": [],
+    "source": "commands/resume.js"
+  },
+  {
+    "name": "role",
+    "description": "بەخشینی ڕۆڵ بە ئەندامێک لە ناو سێروەردا",
+    "options": [
+      "user"
+    ],
+    "source": "commands/role.js"
+  },
+  {
+    "name": "roles",
+    "description": "پیشاندانی لیستی رۆڵەکانی خۆت یان ئەندامێکی تر لە سێروەردا",
+    "options": [
+      "user"
+    ],
+    "source": "commands/roles.js"
+  },
+  {
+    "name": "roll",
+    "description": "هەڵدانی زاری (Dice) بۆ دەرکردنی ژمارەیەکی هەڕەمەکی",
+    "options": [
+      "max"
+    ],
+    "source": "commands/roll.js"
+  },
+  {
+    "name": "say",
+    "description": "ناردنی پەیام لە ڕێگەی بۆتەوە",
+    "options": [
+      "message"
+    ],
+    "source": "commands/say.js"
+  },
+  {
+    "name": "search",
+    "description": "گەڕان بەدوای گۆرانییەکدا و هەڵبژاردنی لە لیستێک",
+    "options": [
+      "query"
+    ],
+    "source": "commands/search.js"
+  },
+  {
+    "name": "serverbanner",
+    "description": "پیشاندانی ڕووی پێشەوەی (Banner) سێروەرەکە",
+    "options": [],
+    "source": "commands/serverbanner.js"
+  },
+  {
+    "name": "servericon",
+    "description": "پیشاندانی وێنەی سێروەرەکە (Icon)",
+    "options": [],
+    "source": "commands/servericon.js"
+  },
+  {
+    "name": "serverinfo",
+    "description": "پیشاندانی زانیاری تەواو و پرۆفیشناڵی سێروەرەکە",
+    "options": [],
+    "source": "commands/serverinfo.js"
+  },
+  {
+    "name": "setlogs",
+    "description": "دیاریکردنی کەناڵی لۆگ (Logs) بۆ سێروەرەکە",
+    "options": [
+      "channel"
+    ],
+    "source": "commands/setlogs.js"
+  },
+  {
+    "name": "ship",
+    "description": "پشکنی ڕێژەی خۆشەویستی نێوان دوو کەس ❤️",
+    "options": [
+      "user1",
+      "user2"
+    ],
+    "source": "commands/ship.js"
+  },
+  {
+    "name": "skip",
+    "description": "تێپەڕاندنی گۆرانی ئێستا و چوون بۆ گۆرانی داهاتوو",
+    "options": [],
+    "source": "commands/skip.js"
+  },
+  {
+    "name": "slowmode",
+    "description": "دیاریکردنی کاتی سۆلمۆد (Slowmode) بۆ کەناڵەکە",
+    "options": [
+      "seconds"
+    ],
+    "source": "commands/slowmode.js"
+  },
+  {
+    "name": "spotify",
+    "description": "لێدانی هەموو گۆرانییەکانی پلەیلیستی سپۆتیفای بە یەک فەرمان",
+    "options": [],
+    "source": "commands/spotify.js"
+  },
+  {
+    "name": "stop",
+    "description": "وەستاندنی مۆسیقا و سڕینەوەی لیستی پەخش (Queue)",
+    "options": [],
+    "source": "commands/stop.js"
+  },
+  {
+    "name": "ticket",
+    "description": "ناردنی پەناڵی دروستکردنی تکێت (Ticket Panel)",
+    "options": [],
+    "source": "commands/ticket.js"
+  },
+  {
+    "name": "unban",
+    "description": "لابردنی باند (Unban) لە بەکارهێنەرێک لەڕێگەی ئایدییەکەیەوە",
+    "options": [
+      "userid"
+    ],
+    "source": "commands/unban.js"
+  },
+  {
+    "name": "unlock",
+    "description": "کردنەوەی کەناڵەکە و ڕێگەدان بە ئەندامان بۆ نووسین",
+    "options": [],
+    "source": "commands/unlock.js"
+  },
+  {
+    "name": "unmute",
+    "description": "لابردنی میوت (Timeout) لەسەر بەکارهێنەرێک",
+    "options": [
+      "user"
+    ],
+    "source": "commands/unmute.js"
+  },
+  {
+    "name": "unwarn",
+    "description": "لابردنی دوایین ئاگادارکردنەوە (Warning) لە بەکارهێنەرێک",
+    "options": [
+      "user"
+    ],
+    "source": "commands/unwarn.js"
+  },
+  {
+    "name": "uptime",
+    "description": "پیشاندانی ماوەی بەردەوامی و کارکردنی بۆتەکە",
+    "options": [],
+    "source": "commands/uptime.js"
+  },
+  {
+    "name": "userinfo",
+    "description": "پیشاندانی زانیاری تەواو و پرۆفیشناڵی بەکارهێنەر",
+    "options": [
+      "user"
+    ],
+    "source": "commands/userinfo.js"
+  },
+  {
+    "name": "volume",
+    "description": "گۆڕینی ئاستی دەنگی مۆسیقاکە",
+    "options": [
+      "level"
+    ],
+    "source": "commands/volume.js"
+  },
+  {
+    "name": "warn",
+    "description": "ئاگادارکردنەوەی بەکارهێنەرێک (Warning)",
+    "options": [
+      "user",
+      "reason"
+    ],
+    "source": "commands/warn.js"
+  },
+  {
+    "name": "warnings",
+    "description": "پیشاندانی لیستی ئاگادارکردنەوەکانی بەکارهێنەرێک",
+    "options": [
+      "user"
+    ],
+    "source": "commands/warnings.js"
+  },
+  {
+    "name": "welcome",
+    "description": "ڕێکخستنی کەناڵی بەخێرهاتن",
+    "options": [
+      "set",
+      "channel",
+      "off",
+      "status"
+    ],
+    "source": "commands/welcome.js"
+  }
+]
