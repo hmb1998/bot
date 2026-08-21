@@ -1,5 +1,9 @@
 import asyncio
 import logging
+import os
+import re
+import subprocess
+import sys
 from collections import deque
 
 import discord
@@ -39,11 +43,109 @@ class MusicManager:
         self.skip_once = set()
 
     async def extract(self, query):
+        """Resolve a music query from YouTube, TikTok, Spotify, or any
+        URL supported by yt-dlp. Spotify is resolved to YouTube sources
+        through spotDL, so Spotify tracks/playlists do not get passed to
+        yt-dlp directly.
+        """
         loop = asyncio.get_running_loop()
 
         def work():
+            query = query.strip()
+            is_url = bool(re.match(r"^https?://", query, re.I))
+            is_spotify = bool(
+                re.search(r"https?://(?:open\.)?spotify\.com/", query, re.I)
+                or re.search(r"https?://spotify\.link/", query, re.I)
+            )
+
+            # Spotify itself does not provide a raw audio URL for this bot.
+            # spotDL resolves Spotify tracks/playlists to matching YouTube
+            # sources, which are then streamed by yt-dlp.
+            if is_spotify:
+                try:
+                    proc = subprocess.run(
+                        [sys.executable, "-m", "spotdl", "url", query],
+                        capture_output=True,
+                        text=True,
+                        timeout=90,
+                        check=False,
+                    )
+                except FileNotFoundError:
+                    raise RuntimeError(
+                        "Spotify support بۆ spotDL دامەزرابوو نییە."
+                    )
+
+                urls = re.findall(
+                    r"https?://(?:www\.)?(?:youtube\.com/watch\?[^\s]+|youtu\.be/[^\s]+)",
+                    proc.stdout or "",
+                )
+                if not urls:
+                    details = (proc.stderr or proc.stdout or "").strip()
+                    raise RuntimeError(
+                        "نەتوانرا Spotify لینکەکە بۆ گۆرانییەکی YouTube بگۆڕدرێت."
+                        + (f" {details[-250:]}" if details else "")
+                    )
+
+                # Return all resolved Spotify items; play() will queue them.
+                tracks = []
+                with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+                    for source_url in urls[:100]:
+                        try:
+                            info = ydl.extract_info(source_url, download=False)
+                            if not info:
+                                continue
+                            if "entries" in info:
+                                info = next(
+                                    (entry for entry in info["entries"] if entry),
+                                    None,
+                                )
+                            if not info:
+                                continue
+                            audio_url = info.get("url") or info.get("webpage_url")
+                            if audio_url:
+                                tracks.append(
+                                    Track(
+                                        info.get("title", source_url),
+                                        audio_url,
+                                        info.get("webpage_url", source_url),
+                                    )
+                                )
+                        except Exception as exc:
+                            logging.getLogger("HMB_GLOBAL").warning(
+                                "Spotify item skipped: %s", exc
+                            )
+                if not tracks:
+                    raise RuntimeError(
+                        "Spotify لینکەکە دۆزرایەوە، بەڵام هیچ سەرچاوەیەکی دەنگی بەردەست نەبوو."
+                    )
+                return tracks
+
             with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
-                info = ydl.extract_info(query, download=False)
+                try:
+                    info = ydl.extract_info(query, download=False)
+                except Exception as first_error:
+                    # If a direct video is blocked/DRM-protected, try a
+                    # YouTube search using the URL text as a last-resort
+                    # fallback instead of crashing the command.
+                    if is_url:
+                        try:
+                            fallback = ydl.extract_info(
+                                f"ytsearch1:{query}",
+                                download=False,
+                            )
+                            info = (
+                                next(
+                                    (entry for entry in fallback.get("entries", []) if entry),
+                                    None,
+                                )
+                                if fallback
+                                else None
+                            )
+                        except Exception:
+                            raise first_error
+                    else:
+                        raise
+
                 if not info:
                     raise RuntimeError("هیچ ئەنجامێک نەدۆزرایەوە.")
                 if "entries" in info:
@@ -55,11 +157,13 @@ class MusicManager:
                 if not url:
                     raise RuntimeError("لینکی دەنگی گۆرانی نەدۆزرایەوە.")
 
-                return Track(
-                    info.get("title", query),
-                    url,
-                    info.get("webpage_url"),
-                )
+                return [
+                    Track(
+                        info.get("title", query),
+                        url,
+                        info.get("webpage_url"),
+                    )
+                ]
 
         return await loop.run_in_executor(None, work)
 
@@ -141,18 +245,26 @@ def setup_music_commands(bot):
                 )
 
             await interaction.response.defer()
-            track = await bot.music.extract(song)
+            tracks = await bot.music.extract(song)
+            if not isinstance(tracks, list):
+                tracks = [tracks]
+
             queue = bot.music.queues.setdefault(
                 interaction.guild.id, deque()
             )
-            queue.append(track)
+            queue.extend(tracks)
 
             if not vc.is_playing() and not vc.is_paused():
                 await bot.music.play_next(interaction.guild.id)
 
-            await interaction.followup.send(
-                f"🎵 دانرا بۆ پەخشکردن: **{track.title}**"
-            )
+            if len(tracks) == 1:
+                message = f"🎵 دانرا بۆ پەخشکردن: **{tracks[0].title}**"
+            else:
+                message = (
+                    f"🎵 **{len(tracks)}** گۆرانی لە queue دانرا.\n"
+                    f"▶️ یەکەم: **{tracks[0].title}**"
+                )
+            await interaction.followup.send(message)
         except Exception as e:
             logging.getLogger("HMB_GLOBAL").exception("Play command failed")
             message = str(e).replace("`", "'")[:500]

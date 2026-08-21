@@ -5,3 +5,5 @@ yt-dlp>=2025.1
 PyNaCl>=1.6.0,<1.7
 davey>=0.1.0,<0.2
 aiohttp>=3.10
+spotdl>=4.5.2,<5
+spotdl>=4.4,<5

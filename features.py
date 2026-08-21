@@ -1,4 +1,6 @@
 import ast, operator, random, time
+from collections import defaultdict, deque
+from datetime import timedelta
 import discord
 from discord import app_commands
 
@@ -26,6 +28,67 @@ def safe_calc(expression: str):
     return result
 
 def setup_features(bot):
+    # Second-layer anti-spam: duplicate messages, mention floods, long floods
+    # and high-frequency bursts. The main handler keeps its basic limiter too.
+    spam_windows = defaultdict(deque)
+    last_text = {}
+    duplicate_count = defaultdict(int)
+    cooldown = {}
+
+    @bot.listen("on_message")
+    async def hmb_strong_antispam(message: discord.Message):
+        if message.author.bot or not message.guild:
+            return
+        if not bot.store.get_bool(message.guild.id, "antispam"):
+            return
+        if message.author.guild_permissions.administrator or message.author.guild_permissions.manage_messages:
+            return
+
+        key = (message.guild.id, message.author.id)
+        now = time.monotonic()
+        q = spam_windows[key]
+        q.append(now)
+        while q and now - q[0] > 10:
+            q.popleft()
+
+        normalized = " ".join(message.content.lower().split())[:300]
+        if normalized and normalized == last_text.get(key):
+            duplicate_count[key] += 1
+        else:
+            duplicate_count[key] = 1
+            last_text[key] = normalized
+
+        too_fast = len(q) >= 8
+        repeated = duplicate_count[key] >= 3
+        mention_spam = len(message.mentions) + len(message.role_mentions) >= 5
+        content_flood = len(message.content) >= 1500
+        if not (too_fast or repeated or mention_spam or content_flood):
+            return
+        if now < cooldown.get(key, 0):
+            return
+        cooldown[key] = now + 10
+
+        try:
+            await message.delete()
+        except discord.HTTPException:
+            pass
+
+        try:
+            await message.author.timeout(
+                discord.utils.utcnow() + timedelta(seconds=60),
+                reason="HMB GLOBAL anti-spam"
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+        try:
+            await message.channel.send(
+                f"🛡️ {message.author.mention} دژەسپام چالاک بوو؛ تکایە سپام مەکە.",
+                delete_after=5,
+            )
+        except discord.HTTPException:
+            pass
+
     @bot.tree.command(name="antispam", description="چالاککردن یان ناچالاککردنی دژە سپام")
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(action="on/off/status")
@@ -44,7 +107,7 @@ def setup_features(bot):
 
     @bot.tree.command(name="botstats", description="ئاماری بۆت")
     async def botstats(interaction: discord.Interaction):
-        await interaction.response.send_message(f"🤖 HMB GLOBAL\n🏠 Servers: {len(bot.guilds)}\n📡 Ping: {round(bot.latency*1000)}ms\n🐍 Python 3.12")
+        await interaction.response.send_message(f"🤖 HMB GLOBAL\n🏠 Servers: {len(bot.guilds)}\n📡 Ping: {round(bot.latency*1000)}ms\n🐍 Python 3.12\n⌨️ Commands: /help و $help")
 
     @bot.tree.command(name="uptime", description="کاتی کارکردنی بۆت")
     async def uptime(interaction: discord.Interaction):
@@ -70,7 +133,7 @@ def setup_features(bot):
     @bot.tree.command(name="help", description="یارمەتی command ـەکان")
     async def help_cmd(interaction: discord.Interaction):
         cmds=sorted(c.name for c in bot.tree.get_commands())
-        await interaction.response.send_message(("📚 Commands:\n"+" • ".join(f"`{x}`" for x in cmds))[:4000], ephemeral=True)
+        await interaction.response.send_message(("🤖 HMB GLOBAL — Command Center\n▶️ Slash: `/command`\n⌨️ Prefix: `$command`\n\n📚 Commands:\n"+" • ".join(f"`{x}`" for x in cmds))[:4000], ephemeral=True)
 
     @bot.tree.command(name="calculator", description="ژمێریاری")
     async def calculator(interaction: discord.Interaction, expression: str):

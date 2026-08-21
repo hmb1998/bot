@@ -40,7 +40,7 @@ PORT = int(os.getenv("PORT", "3000"))
 OWNER_ID = int(os.getenv("OWNER_ID", "0") or 0)
 
 REGISTER_COMMANDS = (
-    os.getenv("REGISTER_COMMANDS", "false").lower() == "true"
+    os.getenv("REGISTER_COMMANDS", "true").lower() == "true"
 )
 
 
@@ -603,7 +603,7 @@ class HMBGlobal(commands.Bot):
 
                 activity=discord.Activity(
                     type=discord.ActivityType.listening,
-                    name="HMB GLOBAL • Python"
+                    name="/help • $help | HMB GLOBAL"
                 ),
 
                 status=discord.Status.online
@@ -802,21 +802,33 @@ async def on_message(
 
                 q.popleft()
 
-            # 5 messages in 7 seconds
+            # Strong burst protection: 5/7 is the first threshold; the
+            # extra listener in features.py handles duplicates, mention floods
+            # and content floods as a second layer.
             if len(q) >= 5:
 
                 try:
-
                     await message.delete()
+                except discord.HTTPException:
+                    pass
 
+                # Escalate repeated bursts to a short timeout when the bot
+                # has Moderate Members permission.
+                if len(q) >= 8:
+                    try:
+                        await message.author.timeout(
+                            discord.utils.utcnow() + __import__("datetime").timedelta(seconds=60),
+                            reason="HMB GLOBAL anti-spam burst"
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
+
+                try:
                     await message.channel.send(
-                        f"🛡️ <@{message.author.id}> "
-                        f"تکایە سپام مەکە.",
+                        f"🛡️ <@{message.author.id}> تکایە سپام مەکە.",
                         delete_after=5
                     )
-
                 except discord.HTTPException:
-
                     pass
 
                 return

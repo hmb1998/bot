@@ -1,7 +1,132 @@
 import asyncio, random, re, string
+from collections import deque
 from datetime import timedelta
 import discord
 from discord import app_commands
+
+
+
+class HMBControlView(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=300)
+        self.bot = bot
+
+    async def _music(self, interaction, action):
+        vc = interaction.guild.voice_client if interaction.guild else None
+        gid = interaction.guild.id
+        if action == "pause":
+            if vc and vc.is_playing():
+                vc.pause()
+                return await interaction.response.send_message("⏸️ وەستێنرا.", ephemeral=True)
+            return await interaction.response.send_message("❌ هیچ گۆرانییەک لە پەخشکردندا نییە.", ephemeral=True)
+        if action == "resume":
+            if vc and vc.is_paused():
+                vc.resume()
+                return await interaction.response.send_message("▶️ بەردەوام بوو.", ephemeral=True)
+            return await interaction.response.send_message("❌ گۆرانی وەستاندراو نییە.", ephemeral=True)
+        if action == "skip":
+            if vc and (vc.is_playing() or vc.is_paused()):
+                self.bot.music.skip_once.add(gid)
+                vc.stop()
+                return await interaction.response.send_message("⏭️ Skip کرا.", ephemeral=True)
+            return await interaction.response.send_message("❌ هیچ گۆرانییەک نییە.", ephemeral=True)
+        if action == "stop":
+            self.bot.music.loop[gid] = False
+            self.bot.music.skip_once.discard(gid)
+            self.bot.music.current.pop(gid, None)
+            self.bot.music.queues[gid] = deque()
+            if vc:
+                vc.stop()
+            return await interaction.response.send_message("⏹️ پەخشکردن و queue وەستاندرا.", ephemeral=True)
+        if action == "queue":
+            q = self.bot.music.queues.get(gid, deque())
+            cur = self.bot.music.current.get(gid)
+            text = f"🎵 ئێستا: **{cur.title}**\n" if cur else ""
+            text += "\n".join(f"{i + 1}. {x.title}" for i, x in enumerate(q)) or "Queue بەتاڵە."
+            return await interaction.response.send_message(text[:1900], ephemeral=True)
+
+    async def _volume(self, interaction, value):
+        gid = interaction.guild.id
+        self.bot.music.volume[gid] = value / 100
+        vc = interaction.guild.voice_client
+        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+            vc.source.volume = value / 100
+        await interaction.response.send_message(f"🔊 Volume = **{value}%**", ephemeral=True)
+
+    async def _security(self, interaction, key, label):
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ تەنها Administrator.", ephemeral=True)
+        state = not self.bot.store.get_bool(interaction.guild.id, key)
+        self.bot.store.set(interaction.guild.id, key, state)
+        await interaction.response.send_message(f"{label}: {'ON ✅' if state else 'OFF ❌'}", ephemeral=True)
+
+    @discord.ui.button(label="Pause", emoji="⏸️", style=discord.ButtonStyle.secondary, row=0)
+    async def pause_btn(self, interaction, button):
+        await self._music(interaction, "pause")
+
+    @discord.ui.button(label="Resume", emoji="▶️", style=discord.ButtonStyle.success, row=0)
+    async def resume_btn(self, interaction, button):
+        await self._music(interaction, "resume")
+
+    @discord.ui.button(label="Skip", emoji="⏭️", style=discord.ButtonStyle.primary, row=0)
+    async def skip_btn(self, interaction, button):
+        await self._music(interaction, "skip")
+
+    @discord.ui.button(label="Stop", emoji="⏹️", style=discord.ButtonStyle.danger, row=0)
+    async def stop_btn(self, interaction, button):
+        await self._music(interaction, "stop")
+
+    @discord.ui.button(label="Queue", emoji="📜", style=discord.ButtonStyle.secondary, row=0)
+    async def queue_btn(self, interaction, button):
+        await self._music(interaction, "queue")
+
+    @discord.ui.button(label="25%", style=discord.ButtonStyle.secondary, row=1)
+    async def vol25_btn(self, interaction, button):
+        await self._volume(interaction, 25)
+
+    @discord.ui.button(label="50%", style=discord.ButtonStyle.secondary, row=1)
+    async def vol50_btn(self, interaction, button):
+        await self._volume(interaction, 50)
+
+    @discord.ui.button(label="75%", style=discord.ButtonStyle.secondary, row=1)
+    async def vol75_btn(self, interaction, button):
+        await self._volume(interaction, 75)
+
+    @discord.ui.button(label="100%", style=discord.ButtonStyle.secondary, row=1)
+    async def vol100_btn(self, interaction, button):
+        await self._volume(interaction, 100)
+
+    @discord.ui.button(label="Loop", emoji="🔁", style=discord.ButtonStyle.primary, row=1)
+    async def loop_btn(self, interaction, button):
+        gid = interaction.guild.id
+        state = not self.bot.music.loop.get(gid, False)
+        self.bot.music.loop[gid] = state
+        await interaction.response.send_message(f"🔁 Loop: {'ON ✅' if state else 'OFF ❌'}", ephemeral=True)
+
+    @discord.ui.button(label="Anti-Spam", emoji="🛡️", style=discord.ButtonStyle.success, row=2)
+    async def antispam_btn(self, interaction, button):
+        await self._security(interaction, "antispam", "Anti-Spam")
+
+    @discord.ui.button(label="Link Guard", emoji="🔗", style=discord.ButtonStyle.success, row=2)
+    async def link_btn(self, interaction, button):
+        await self._security(interaction, "link_protection", "Link Protection")
+
+    @discord.ui.button(label="Status", emoji="📊", style=discord.ButtonStyle.secondary, row=2)
+    async def status_btn(self, interaction, button):
+        gid = interaction.guild.id
+        vc = interaction.guild.voice_client
+        cur = self.bot.music.current.get(gid)
+        anti = self.bot.store.get_bool(gid, "antispam")
+        link = self.bot.store.get_bool(gid, "link_protection")
+        await interaction.response.send_message(
+            f"🤖 **HMB GLOBAL**\n🎵 Now: **{cur.title if cur else 'None'}**\n"
+            f"🔊 Voice: **{'Connected' if vc else 'Disconnected'}**\n"
+            f"🛡️ Anti-Spam: **{'ON' if anti else 'OFF'}**\n"
+            f"🔗 Link Guard: **{'ON' if link else 'OFF'}**\n"
+            "⌨️ `/command` یان `$command`",
+            ephemeral=True,
+        )
+
 
 def setup_extra_commands(bot):
     @bot.tree.command(name="ascii",description="گۆڕینی دەق بۆ ASCII")
@@ -170,9 +295,19 @@ def setup_extra_commands(bot):
     async def spotify(interaction: discord.Interaction,url: str):
         await interaction.response.send_message("🎵 Spotify URL وەرگیرا؛ بۆ یاری لە یوتیوب `/play` بەکاربهێنە.",ephemeral=True)
 
-    @bot.tree.command(name="control",description="تابلۆی کۆنترۆڵی موزیک")
+    @bot.tree.command(name="control",description="کۆنترۆڵی تەواوی موزیک و دژەسپام")
     async def control(interaction: discord.Interaction):
-        await interaction.response.send_message("🎵 Music Control\n/play • /pause • /resume • /skip • /stop • /queue • /loop")
+        embed = discord.Embed(
+            title="🤖 HMB GLOBAL — Control Center",
+            description=(
+                "🎵 **Music:** Play / Pause / Resume / Skip / Stop / Queue / Loop\n"
+                "🔊 **Volume:** 25% / 50% / 75% / 100%\n"
+                "🛡️ **Security:** Anti-Spam / Link Guard\n\n"
+                "⌨️ هەموو command ـەکان بە `/command` و `$command` کار دەکەن.\n"
+                "▶️ نموونە: `/play` یان `$play`"
+            ),
+        )
+        await interaction.response.send_message(embed=embed, view=HMBControlView(bot))
 
     @bot.tree.command(name="mazensido",description="مێنوی گۆرانی")
     async def mazensido(interaction: discord.Interaction):
