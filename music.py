@@ -51,12 +51,16 @@ class MusicManager:
         """
         loop = asyncio.get_running_loop()
 
+        query_text = str(query or "").strip()
+        if not query_text:
+            raise RuntimeError("تکایە ناوی گۆرانی یان لینکێک بنووسە.")
+
         def work():
-            query = query.strip()
-            is_url = bool(re.match(r"^https?://", query, re.I))
+            current_query = query_text
+            is_url = bool(re.match(r"^https?://", current_query, re.I))
             is_spotify = bool(
-                re.search(r"https?://(?:open\.)?spotify\.com/", query, re.I)
-                or re.search(r"https?://spotify\.link/", query, re.I)
+                re.search(r"https?://(?:open\.)?spotify\.com/", current_query, re.I)
+                or re.search(r"https?://spotify\.link/", current_query, re.I)
             )
 
             # Spotify itself does not provide a raw audio URL for this bot.
@@ -65,7 +69,7 @@ class MusicManager:
             if is_spotify:
                 try:
                     proc = subprocess.run(
-                        [sys.executable, "-m", "spotdl", "url", query],
+                        [sys.executable, "-m", "spotdl", "url", current_query],
                         capture_output=True,
                         text=True,
                         timeout=90,
@@ -123,7 +127,7 @@ class MusicManager:
 
             with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
                 try:
-                    info = ydl.extract_info(query, download=False)
+                    info = ydl.extract_info(current_query, download=False)
                 except Exception as first_error:
                     # If a direct video is blocked/DRM-protected, try a
                     # YouTube search using the URL text as a last-resort
@@ -131,7 +135,7 @@ class MusicManager:
                     if is_url:
                         try:
                             fallback = ydl.extract_info(
-                                f"ytsearch1:{query}",
+                                f"ytsearch1:{current_query}",
                                 download=False,
                             )
                             info = (
@@ -160,7 +164,7 @@ class MusicManager:
 
                 return [
                     Track(
-                        info.get("title", query),
+                        info.get("title", current_query),
                         url,
                         info.get("webpage_url"),
                     )
@@ -231,6 +235,11 @@ class MusicManager:
 
 
 def setup_music_commands(bot):
+    # setup_hook should be safe if invoked more than once.
+    if getattr(bot, "_hmb_music_commands_registered", False):
+        return
+    bot._hmb_music_commands_registered = True
+
     @bot.tree.command(
         name="play",
         description="لێدانی گۆرانی بە ناونیشان یان لینک",

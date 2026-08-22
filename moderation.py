@@ -3,6 +3,11 @@ import discord
 from discord import app_commands
 
 def setup_moderation(bot):
+    # setup_hook should be safe if invoked more than once.
+    if getattr(bot, "_hmb_moderation_commands_registered", False):
+        return
+    bot._hmb_moderation_commands_registered = True
+
     @bot.tree.command(name="ping",description="پشکنینی خێرایی")
     async def ping(interaction: discord.Interaction): await interaction.response.send_message(f"🏓 Pong! API: {round(bot.latency*1000)} ms")
 

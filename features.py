@@ -38,6 +38,11 @@ def safe_calc(expression: str):
 
 
 def setup_features(bot):
+    # setup_hook should be safe if invoked more than once.
+    if getattr(bot, "_hmb_feature_commands_registered", False):
+        return
+    bot._hmb_feature_commands_registered = True
+
     @bot.tree.command(name="antispam", description="دژەسپام: چالاک/ناچالاک/دۆخ")
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(action="on / off / status")
