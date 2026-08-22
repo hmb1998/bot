@@ -4,8 +4,6 @@ import logging
 import os
 import random
 import re
-import subprocess
-import sys
 import tempfile
 from collections import deque
 
@@ -122,8 +120,6 @@ class MusicManager:
         try:
             is_url = bool(re.match(r"^https?://", query_text, re.I))
 
-            if self._is_spotify_url(query_text):
-                return self._extract_spotify(query_text, cookie_file)
 
             if self._is_tiktok_url(query_text):
                 return self._extract_generic_url(query_text, cookie_file, "TikTok")
@@ -141,13 +137,6 @@ class MusicManager:
                     os.unlink(cookie_file)
                 except OSError:
                     pass
-
-    @staticmethod
-    def _is_spotify_url(url):
-        return bool(
-            re.search(r"https?://(?:open\.)?spotify\.com/", url, re.I)
-            or re.search(r"https?://spotify\.link/", url, re.I)
-        )
 
     @staticmethod
     def _is_tiktok_url(url):
@@ -168,93 +157,6 @@ class MusicManager:
                 re.I,
             )
         )
-
-    def _extract_spotify(self, spotify_url, cookie_file):
-        cmd = [
-            sys.executable,
-            "-m",
-            "spotdl",
-            "--use-official-api",
-            "--no-cache",
-        ]
-
-        client_id = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
-        client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
-
-        if client_id:
-            cmd += ["--client-id", client_id]
-        if client_secret:
-            cmd += ["--client-secret", client_secret]
-
-        cmd += ["url", spotify_url]
-
-        try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=120,
-                check=False,
-            )
-        except FileNotFoundError:
-            raise RuntimeError("Spotify support بۆ spotDL دامەزرابوو نییە.")
-
-        combined = "\n".join(
-            x for x in ((proc.stdout or "").strip(), (proc.stderr or "").strip()) if x
-        )
-        lower = combined.lower()
-
-        if "baseclienterror" in lower or "could not get session" in lower:
-            if not client_id or not client_secret:
-                raise RuntimeError(
-                    "⚠️ Spotify session لە Railway شکستی هێنا. "
-                    "بۆ لینکەکانی Spotify، SPOTIFY_CLIENT_ID و "
-                    "SPOTIFY_CLIENT_SECRET لە Variables دابنێ و Redeploy بکە."
-                )
-            raise RuntimeError(
-                "⚠️ Spotify API session شکستی هێنا؛ "
-                "Spotify ڕێگەی نەدا."
-            )
-
-        urls = re.findall(
-            r"https?://(?:www\.)?(?:music\.)?youtube\.com/watch\?[^\s]+|"
-            r"https?://youtu\.be/[^\s]+",
-            proc.stdout or "",
-            flags=re.I,
-        )
-
-        if not urls:
-            urls = re.findall(
-                r"https?://(?:www\.)?(?:music\.)?youtube\.com/watch\?[^\s]+|"
-                r"https?://youtu\.be/[^\s]+",
-                combined,
-                flags=re.I,
-            )
-
-        unique_urls = list(dict.fromkeys(urls))
-        if not unique_urls:
-            details = (proc.stderr or proc.stdout or "").strip()
-            raise RuntimeError(
-                "نەتوانرا Spotify لینکەکە بۆ گۆرانییەکی بەردەست بگۆڕدرێت."
-                + (f" {details[-350:]}" if details else "")
-            )
-
-        tracks = []
-        errors = []
-        for source_url in unique_urls[:25]:
-            try:
-                tracks.extend(self._extract_youtube_url(source_url, cookie_file))
-            except Exception as exc:
-                errors.append(str(exc))
-                LOG.warning("Spotify item skipped: %s", exc)
-
-        if not tracks:
-            raise RuntimeError(
-                "Spotify گۆرانییەکەی دۆزییەوە، بەڵام YouTube ئێستا ڕێگەی پەخشکردنی نەدا. "
-                + self._friendly_youtube_error(errors[-1] if errors else "")
-            )
-
-        return tracks
 
     def _extract_search(self, query_text, cookie_file):
         errors = []
@@ -472,7 +374,7 @@ def setup_music_commands(bot):
         description="لێدانی گۆرانی بە ناونیشان یان لینک",
     )
     @app_commands.describe(
-        song="ناوی گۆرانی یان لینکی YouTube / Spotify / TikTok"
+        song="ناوی گۆرانی یان لینکی YouTube / TikTok"
     )
     async def play(interaction: discord.Interaction, song: str):
         try:

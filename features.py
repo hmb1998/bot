@@ -44,7 +44,7 @@ def safe_calc(expression: str):
 # =========================================================
 
 _HELP_CATEGORIES = {
-    "🎵 MUSIC & PLAYER": {"play", "search", "spotify", "join", "leave", "pause", "resume", "skip", "stop", "queue", "shuffle", "nowplaying", "clearqueue", "remove", "volume", "loop", "mazensido", "azar"},
+    "🎵 MUSIC & PLAYER": {"play", "search", "join", "leave", "pause", "resume", "skip", "stop", "queue", "shuffle", "nowplaying", "clearqueue", "remove", "volume", "loop", "mazensido", "azar"},
     "🛡️ MODERATION & SECURITY": {"ping", "ban", "kick", "clear", "slowmode", "lock", "unlock", "say", "nick", "nickname", "role", "removerole", "mute", "unmute", "warn", "warnings", "clearwarns", "unwarn", "unban", "purgebots", "purgehumans", "nuke", "antispam", "link", "setlogs"},
     "🎫 SERVER & MANAGEMENT": {"control", "ticket", "add", "ticket-remove", "close", "autorole", "welcome", "giveaway", "refresh", "owner"},
     "👤 INFO & PROFILE": {"serverinfo", "userinfo", "roles", "servericon", "serverbanner", "banner", "rank", "botstats", "uptime", "debug", "invite", "avatar"},

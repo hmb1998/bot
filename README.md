@@ -1,4 +1,4 @@
-# HMB_GLOBAL — final no-cookie YouTube/Spotify fix
+# HMB_GLOBAL — final no-cookie YouTube/TikTok fix
 
 The Railway logs show the remaining failure is YouTube's datacenter bot check:
 `Sign in to confirm you're not a bot`.

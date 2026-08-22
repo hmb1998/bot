@@ -9,7 +9,7 @@ from discord import app_commands
 class MusicSearchModal(discord.ui.Modal, title="🎵 گەڕانی گۆرانی"):
     query = discord.ui.TextInput(
         label="ناوی گۆرانی یان لینکی گۆرانی",
-        placeholder="مثال: Mert Demir - Ateşe Düştüm یان YouTube/Spotify/TikTok URL",
+        placeholder="مثال: Mert Demir - Ateşe Düştüm یان YouTube URL یان ناوی گۆرانی",
         required=True,
         max_length=500,
     )
@@ -20,6 +20,11 @@ class MusicSearchModal(discord.ui.Modal, title="🎵 گەڕانی گۆرانی")
 
     async def on_submit(self, interaction: discord.Interaction):
         query = str(self.query).strip()
+        if re.match(r"^https?://", query, re.I) and not self.bot.music._is_youtube_url(query):
+            return await interaction.response.send_message(
+                "❌ لە کۆنترۆڵ → گەڕاندا تەنها لینکی YouTube بەکاردێت.",
+                ephemeral=True,
+            )
         try:
             vc = await self.bot.music.ensure_voice(interaction)
             if not vc:
@@ -366,13 +371,28 @@ def setup_extra_commands(bot):
         q,a=random.choice(questions)
         await interaction.response.send_message(f"🧠 **Quiz:** {q}\nوەڵام: ||{a}||")
 
-    @bot.tree.command(name="search",description="گەڕان بەدوای گۆرانی")
+    @bot.tree.command(name="search",description="گەڕان لە YouTube بە ناوی گۆرانی یان لینک")
     async def search(interaction: discord.Interaction,song: str):
-        await interaction.response.send_message(f"🔎 گەڕان بۆ: **{song}**\nبۆ پەخشکردن `/play {song}` بەکاربهێنە.")
-
-    @bot.tree.command(name="spotify",description="پەخشکردنی playlist")
-    async def spotify(interaction: discord.Interaction,url: str):
-        await interaction.response.send_message("🎵 Spotify URL وەرگیرا؛ بۆ یاری لە یوتیوب `/play` بەکاربهێنە.",ephemeral=True)
+        try:
+            query = song.strip()
+            if re.match(r"^https?://", query, re.I) and not bot.music._is_youtube_url(query):
+                return await interaction.response.send_message(
+                    "❌ لە گەڕاندا تەنها لینکی YouTube پشتگیری دەکرێت.",
+                    ephemeral=True,
+                )
+            await interaction.response.defer()
+            tracks = await bot.music.extract(query)
+            if not tracks:
+                return await interaction.followup.send("❌ هیچ ئەنجامێکی YouTube نەدۆزرایەوە.", ephemeral=True)
+            track = tracks[0]
+            await interaction.followup.send(
+                f"🔎 **ئەنجامی YouTube:**\n🎵 **{track.title}**\n🔗 {track.webpage}\n\n▶️ بۆ پەخشکردن: `/play {query}` یان `${bot.command_prefix}play {query}`"
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                f"❌ گەڕانی YouTube سەرکەوتوو نەبوو.\n`{str(exc)[:700]}`",
+                ephemeral=True,
+            )
 
     @bot.tree.command(name="control",description="کۆنترۆڵی تەواوی موزیک، Queue، Search و دژەسپام")
     async def control(interaction: discord.Interaction):
@@ -380,7 +400,7 @@ def setup_extra_commands(bot):
             title="🤖 HMB GLOBAL • CONTROL CENTER",
             description=(
                 "🎵 **MUSIC**\n"
-                "🔎 Search بە ناوی گۆرانی یان لینک\n"
+                "🔎 Search بە ناوی گۆرانی یان لینکی YouTube\n"
                 "⏯️ Pause / Resume  •  ⏭️ Skip  •  ⏹️ Stop\n"
                 "📜 Queue  •  🔀 Shuffle  •  🧹 Clear Queue  •  🔁 Loop\n"
                 "🎶 Now Playing  •  🔊 Volume 25/50/75/100%\n\n"

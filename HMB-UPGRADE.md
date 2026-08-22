@@ -35,9 +35,9 @@ When Anti-Spam is ON, protection is layered:
 6. Cooldown to avoid repeated warning spam.
 
 ## Music links
-The music resolver accepts normal `yt-dlp` URLs/searches and Spotify URLs through spotDL's `url` operation, which resolves Spotify items to user-friendly source URLs before streaming.
+The music resolver accepts normal `yt-dlp` URLs/searches and TikTok URLs through yt-dlp's `url` operation, which resolves TikTok items to user-friendly source URLs before streaming.
 
-Spotify playlists can therefore be queued as multiple tracks. TikTok/other supported `yt-dlp` URLs are passed through the normal extractor.
+TikTok playlists can therefore be queued as multiple tracks. TikTok/other supported `yt-dlp` URLs are passed through the normal extractor.
 
 ## Railway
 The code now defaults `REGISTER_COMMANDS=true`, so slash commands can register after deploy.

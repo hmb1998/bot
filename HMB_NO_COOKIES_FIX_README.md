@@ -1,16 +1,16 @@
 # HMB GLOBAL music fix
 
-- `/play` supports YouTube URLs/search and Spotify URLs.
-- Spotify extraction now forces spotDL's official Spotify Web API path instead of the failing SpotAPIFree session path.
+- `/play` supports YouTube URLs/search and TikTok URLs.
+- TikTok extraction now forces yt-dlp's official TikTok Web API path instead of the failing SpotAPIFree session path.
 - No YouTube cookie is required by this code. Cookies remain optional if YouTube later asks for authentication.
 - `asyncio` is explicitly imported in `music.py`.
 
-## Railway variables for Spotify
+## Railway variables for TikTok
 
-Set these only if Spotify still rejects the default credentials:
+Set these only if TikTok still rejects the default credentials:
 
-- `SPOTIFY_CLIENT_ID`
-- `SPOTIFY_CLIENT_SECRET`
+- `YOUTUBE_COOKIES_B64`
+- `YOUTUBE_COOKIES_B64`
 
 Do not put these secrets in GitHub files.
 
