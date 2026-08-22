@@ -33,3 +33,15 @@ Result:
 - $remove = same command through the existing prefix adapter
 - /ticket-remove = remove a member from a ticket
 - $ticket-remove = same ticket command through the prefix adapter
+
+MUSIC / YOUTUBE FIX
+-------------------
+- Dockerfile now installs Node.js for yt-dlp YouTube JavaScript challenges.
+- yt-dlp is installed with its default extras.
+- YouTube extraction tries safe clients and does not repeatedly search a URL after a 429.
+- YouTube 429/login errors are converted to a short Kurdish user message.
+- Optional Railway variables:
+  YOUTUBE_COOKIES_FILE=/app/cookies.txt
+  or YOUTUBE_COOKIES_B64=<base64 Netscape cookies.txt>
+  or YOUTUBE_COOKIES=<Netscape cookies.txt text>
+- Do not commit cookies into GitHub. Use Railway Variables only.
