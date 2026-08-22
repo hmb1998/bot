@@ -24,3 +24,16 @@ After replacing the repository files, redeploy Railway and test:
 
 YouTube-side restrictions can still change over time, so no code can guarantee
 that every Railway IP will always be accepted.
+
+
+## Slash-command registration fix
+
+This final bundle also registers the global slash-command tree directly into
+every guild when the bot becomes ready. This is intended to fix the situation
+where Discord shows **“No commands available here”** after a Railway deploy.
+
+After deploying, check Railway Deploy Logs for:
+
+`Registered <number> guild slash commands`
+
+Then open Discord and type `/` or run `/help`.

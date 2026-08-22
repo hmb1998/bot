@@ -136,6 +136,28 @@ class HMBGlobal(commands.Bot):
             len(self.guilds)
         )
 
+        # Force-register the same slash commands directly in every
+        # connected guild. This makes /help and all other slash commands
+        # appear immediately after a Railway restart/redeploy instead of
+        # waiting for Discord's global-command propagation.
+        if REGISTER_COMMANDS:
+            for guild in self.guilds:
+                try:
+                    self.tree.copy_global_to(guild=guild)
+                    synced = await self.tree.sync(guild=guild)
+                    log.info(
+                        "Registered %d guild slash commands | guild=%s (%s)",
+                        len(synced),
+                        guild.name,
+                        guild.id,
+                    )
+                except Exception:
+                    log.exception(
+                        "Guild slash command registration failed | guild=%s (%s)",
+                        guild.name,
+                        guild.id,
+                    )
+
         try:
 
             await self.change_presence(
