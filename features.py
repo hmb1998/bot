@@ -80,7 +80,7 @@ def _param_type_name(param):
 
 
 def _command_usage(command):
-    parts = [f"`/{command.name}`", f"`$${command.name}`".replace("$$", "$", 1)]
+    parts = [f"`/{command.name}`"]
     for param in command.parameters:
         if getattr(param, "required", False):
             parts[0] += f" <{param.name}>"
@@ -111,7 +111,7 @@ def _build_help_embed(bot, page):
         "✨ **هەر فەرمانێک دوگمەی تایبەتی خۆی هەیە.**",
         "🔹 دەست لە دوگمەی فەرمانەکە بدە بۆ بەکارهێنان.",
         "🔹 ئەگەر فەرمانەکە argument ـی پێویستی هەبێت، فۆڕمێک دەکرێتەوە بۆ نووسینی.",
-        "🔹 هەموو فەرمانەکان بە هەردوو شێوازن: `/command` و `$command`.",
+        "🔹 هەموو فەرمانەکان تەنها بە شێوازی `/command` کار دەکەن.",
         "",
     ]
 
@@ -132,7 +132,7 @@ def _build_help_embed(bot, page):
     )
     embed.add_field(
         name="⌨️ شێوازی بەکارهێنان",
-        value="هەموو command ـەکان: `/command` یان `$command`",
+        value="هەموو command ـەکان: `/command`",
         inline=False,
     )
     embed.set_footer(text=f"Page {page + 1}/{total_pages} • {len(commands_list)} commands • ⚡ direct • 📝 input")
@@ -383,7 +383,7 @@ def setup_features(bot):
         await interaction.response.send_message(
             f"🤖 **HMB GLOBAL**\n🏠 Servers: {len(bot.guilds)}\n"
             f"📡 Ping: {round(bot.latency * 1000)}ms\n🐍 Python 3.12\n"
-            "⌨️ `/help` یان `$help`"
+            "⌨️ `/help`"
         )
 
     @bot.tree.command(name="uptime", description="کاتی کارکردنی بۆت")

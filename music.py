@@ -69,11 +69,8 @@ def _youtube_opts(cookie_file=None, client=None):
     opts = dict(YDL_OPTS)
     opts["http_headers"] = dict(YDL_OPTS["http_headers"])
 
-    clients = [client] if client else ["mweb", "web_safari", "android_vr"]
     opts["extractor_args"] = {
-        "youtube": {
-            "player_client": clients,
-        },
+        "youtube": {},
         "youtubepot-bgutilhttp": {
             "base_url": os.getenv("BGUTIL_POT_URL", "http://127.0.0.1:4416"),
         },
@@ -159,53 +156,37 @@ class MusicManager:
         )
 
     def _extract_search(self, query_text, cookie_file):
-        errors = []
-
-        for client in ("mweb", "web_safari", "android_vr"):
-            try:
-                opts = _youtube_opts(cookie_file, client)
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(
-                        f"ytsearch1:{query_text}",
-                        download=False,
-                    )
-
-                track = self._info_to_track(info, query_text)
-                if track:
-                    return [track]
-
-            except Exception as exc:
-                errors.append(str(exc))
-                LOG.warning("YouTube search failed (%s): %s", client, exc)
-
-        raise RuntimeError(
-            self._friendly_youtube_error(errors[-1] if errors else "")
-        )
-
-    def _extract_youtube_url(self, url, cookie_file):
-        errors = []
-
-        for client in ("mweb", "web_safari", "android_vr"):
-            try:
-                opts = _youtube_opts(cookie_file, client)
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-
-                track = self._info_to_track(info, url)
-                if track:
-                    return [track]
-
-            except Exception as exc:
-                errors.append(str(exc))
-                LOG.warning(
-                    "YouTube URL extraction failed (%s): %s",
-                    client,
-                    exc,
+        try:
+            opts = _youtube_opts(cookie_file)
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(
+                    f"ytsearch1:{query_text}",
+                    download=False,
                 )
 
-        raise RuntimeError(
-            self._friendly_youtube_error(errors[-1] if errors else "")
-        )
+            track = self._info_to_track(info, query_text)
+            if track:
+                return [track]
+
+            raise RuntimeError("No YouTube result")
+        except Exception as exc:
+            LOG.warning("YouTube search failed: %s", exc)
+            raise RuntimeError(self._friendly_youtube_error(str(exc)))
+
+    def _extract_youtube_url(self, url, cookie_file):
+        try:
+            opts = _youtube_opts(cookie_file)
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+            track = self._info_to_track(info, url)
+            if track:
+                return [track]
+
+            raise RuntimeError("No YouTube result")
+        except Exception as exc:
+            LOG.warning("YouTube URL extraction failed: %s", exc)
+            raise RuntimeError(self._friendly_youtube_error(str(exc)))
 
     def _extract_generic_url(self, url, cookie_file, source_name):
         try:

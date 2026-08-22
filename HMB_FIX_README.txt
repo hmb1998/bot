@@ -30,9 +30,9 @@ Install:
 
 Result:
 - /remove = remove a song from the music queue
-- $remove = same command through the existing prefix adapter
+- `/remove` = slash command
 - /ticket-remove = remove a member from a ticket
-- $ticket-remove = same ticket command through the prefix adapter
+- `/ticket-remove` = slash command
 
 MUSIC / YOUTUBE FIX
 -------------------

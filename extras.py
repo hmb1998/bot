@@ -198,13 +198,13 @@ class HMBControlView(discord.ui.View):
             f"🔊 Voice: **{'Connected' if vc else 'Disconnected'}**\n"
             f"🛡️ Anti-Spam: **{'ON' if anti else 'OFF'}**\n"
             f"🔗 Link Guard: **{'ON' if link else 'OFF'}**\n"
-            "⌨️ `/command` یان `$command`",
+            "⌨️ تەنها `/command`",
             ephemeral=True,
         )
 
     @discord.ui.button(label="Help", emoji="❓", style=discord.ButtonStyle.secondary, row=3)
     async def help_btn(self, interaction, button):
-        await interaction.response.send_message("📚 بۆ هەموو فەرمانەکان `/help` یان `$help` بەکاربهێنە.", ephemeral=True)
+        await interaction.response.send_message("📚 بۆ هەموو فەرمانەکان `/help` بەکاربهێنە.", ephemeral=True)
 
 
 def setup_extra_commands(bot):
@@ -386,7 +386,7 @@ def setup_extra_commands(bot):
                 return await interaction.followup.send("❌ هیچ ئەنجامێکی YouTube نەدۆزرایەوە.", ephemeral=True)
             track = tracks[0]
             await interaction.followup.send(
-                f"🔎 **ئەنجامی YouTube:**\n🎵 **{track.title}**\n🔗 {track.webpage}\n\n▶️ بۆ پەخشکردن: `/play {query}` یان `${bot.command_prefix}play {query}`"
+                f"🔎 **ئەنجامی YouTube:**\n🎵 **{track.title}**\n🔗 {track.webpage}\n\n▶️ بۆ پەخشکردن: `/play {query}`"
             )
         except Exception as exc:
             await interaction.followup.send(
@@ -407,7 +407,7 @@ def setup_extra_commands(bot):
                 "🛡️ **SECURITY**\n"
                 "Anti-Spam → سپامر پەیامەکانی لە کەناڵەکە دەسڕێتەوە و **10 خولەک Timeout** دەکات.\n"
                 "🔗 Link Guard → کۆنترۆڵی لینکەکان\n\n"
-                "⌨️ هەموو فەرمانەکان بە `/command` و `$command` کار دەکەن.\n"
+                "⌨️ هەموو فەرمانەکان تەنها بە `/command` کار دەکەن.\n"
                 "✨ دوگمەکانی خوارەوە هەموو کۆنترۆڵە سەرەکییەکانت لە یەک شوێن کۆدەکەنەوە."
             ),
             color=discord.Color.blurple(),

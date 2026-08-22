@@ -26,30 +26,10 @@ def _patch_yt_dlp() -> None:
         params = dict(params or {})
         extractor_args = dict(params.get("extractor_args") or {})
 
-        # Preserve the application's existing YouTube options, but make
-        # mweb the first client. bgutil's HTTP provider supplies the PO token
-        # automatically on port 4416.
+        # Do not force mweb/web_safari/android_vr. Let the current
+        # yt-dlp YouTube extractor choose its supported clients.
         youtube_args = dict(extractor_args.get("youtube") or {})
-        configured = youtube_args.get("player_client")
-
-        clients = []
-        if configured:
-            if isinstance(configured, str):
-                configured = [configured]
-            for item in configured:
-                value = str(item)
-                # The existing code passes "default"; it is less useful for
-                # the current YouTube bot-check than mweb.
-                if value in ("default", "web_safari", "android_vr"):
-                    continue
-                if value not in clients:
-                    clients.append(value)
-
-        for client in ("mweb", "tv", "android_vr"):
-            if client not in clients:
-                clients.append(client)
-
-        youtube_args["player_client"] = clients
+        youtube_args.pop("player_client", None)
         extractor_args["youtube"] = youtube_args
 
         # Explicitly point the bgutil plugin at the local provider.
