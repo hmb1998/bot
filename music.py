@@ -1,4 +1,5 @@
 import asyncio
+import asyncio
 import base64
 import logging
 import os
@@ -138,9 +139,30 @@ class MusicManager:
                     pass
 
     def _extract_spotify(self, spotify_url, cookie_file):
+        # spotDL 4.5+ defaults to SpotAPIFree, which currently can fail with
+        # "BaseClientError: Could not get session" on Railway/datacenter IPs.
+        # Force the official Spotify Web API path instead.  Custom credentials
+        # can be supplied as Railway variables without storing secrets here.
+        cmd = [
+            sys.executable, "-m", "spotdl",
+            "--use-official-api",
+            "--no-cache",
+            "url",
+            spotify_url,
+        ]
+
+        client_id = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+        client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+        if client_id:
+            cmd[4:4] = ["--client-id", client_id]
+        if client_secret:
+            # Insert after client-id pair if present, otherwise before url.
+            insert_at = 6 if client_id else 4
+            cmd[insert_at:insert_at] = ["--client-secret", client_secret]
+
         try:
             proc = subprocess.run(
-                [sys.executable, "-m", "spotdl", "url", spotify_url],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=120,
@@ -148,6 +170,16 @@ class MusicManager:
             )
         except FileNotFoundError:
             raise RuntimeError("Spotify support بۆ spotDL دامەزرابوو نییە.")
+
+        combined = "\n".join(
+            x for x in ((proc.stdout or "").strip(), (proc.stderr or "").strip()) if x
+        )
+        if "BaseClientError" in combined or "Could not get session" in combined:
+            raise RuntimeError(
+                "⚠️ Spotify session ـەکە شکستی هێنا. "
+                "لە Railway ـدا SPOTIFY_CLIENT_ID و SPOTIFY_CLIENT_SECRET دابنێ، "
+                "پاشان Redeploy بکە."
+            )
 
         urls = re.findall(
             r"https?://(?:www\.)?(?:youtube\.com/watch\?[^\s]+|youtu\.be/[^\s]+)",
@@ -243,12 +275,12 @@ class MusicManager:
             return (
                 "⚠️ YouTube بۆ ئەم IP ـە کاتییەکە rate-limit ـی کردووە. "
                 "دوای چەند خولەکێک دوبارە تاقی بکەرەوە؛ ئەگەر بەردەوام بوو، "
-                "YOUTUBE_COOKIES_B64 لە Railway دابنێ."
+                "دوای چەند خولەکێک دوبارە تاقی بکەرەوە؛ Cookie تەنها ئەگەر YouTube داوای authentication کرد پێویستە."
             )
         if "sign in to confirm" in lower or "not a bot" in lower or "cookies" in lower:
             return (
                 "⚠️ YouTube داوای authentication/cookies دەکات. "
-                "YOUTUBE_COOKIES_B64 لە Railway دابنێ بۆ پەخشکردنی YouTube."
+                "ئەگەر ئەم هەڵەیە بەردەوام بوو، دەتوانیت YouTube cookie ـی Railway دابنێیت."
             )
         if "javascript runtime" in lower:
             return "⚠️ JavaScript runtime ـی YouTube بەردەست نییە؛ Railway redeploy بکە بۆ وەشانی نوێ."

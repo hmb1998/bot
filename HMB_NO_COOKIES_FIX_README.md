@@ -1,23 +1,17 @@
-# HMB_GLOBAL — YouTube/Spotify no-cookie fix
+# HMB GLOBAL music fix
 
-This patch is for the Railway deployment of `hmb1998/bot`.
+- `/play` supports YouTube URLs/search and Spotify URLs.
+- Spotify extraction now forces spotDL's official Spotify Web API path instead of the failing SpotAPIFree session path.
+- No YouTube cookie is required by this code. Cookies remain optional if YouTube later asks for authentication.
+- `asyncio` is explicitly imported in `music.py`.
 
-## What it changes
+## Railway variables for Spotify
 
-- Installs `bgutil-ytdlp-pot-provider` 1.3.1.
-- Builds and starts the local POT provider on port 4416.
-- Forces yt-dlp to use cookie-free YouTube clients.
-- Spotify/spotDL uses the same patched yt-dlp runtime.
-- No YouTube cookies need to be added to Railway Variables.
+Set these only if Spotify still rejects the default credentials:
 
-## Files
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
 
-Replace/add these files in the repository:
+Do not put these secrets in GitHub files.
 
-1. `requirements.txt`
-2. `Dockerfile`
-3. `sitecustomize.py`
-
-Then redeploy Railway.
-
-The existing `music.py` can stay in place because `sitecustomize.py` patches every yt-dlp `YoutubeDL` instance at startup.
+After uploading/deploying, restart the Railway service.
