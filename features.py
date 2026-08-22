@@ -240,7 +240,7 @@ class HMBCommandModal(discord.ui.Modal):
             self.add_item(text_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        if interaction.user.id != self.owner_id:
+        if self.owner_id is not None and interaction.user.id != self.owner_id:
             return await interaction.response.send_message("❌ ئەم فۆڕمە بۆ تۆ نییە.", ephemeral=True)
         try:
             values = {name: str(field.value) for name, field in self.inputs.items()}
@@ -257,10 +257,11 @@ class HMBCommandModal(discord.ui.Modal):
 
 
 class HMBHelpView(discord.ui.View):
-    def __init__(self, bot, owner_id, page=0):
-        super().__init__(timeout=900)
+    def __init__(self, bot, owner_id=None, page=0, persistent=False):
+        super().__init__(timeout=None if persistent else 900)
         self.bot = bot
         self.owner_id = owner_id
+        self.persistent = persistent
         self.page = page
         self.commands_list = _all_help_commands(bot)
         self.page_size = 20
@@ -268,7 +269,7 @@ class HMBHelpView(discord.ui.View):
         self._build()
 
     async def interaction_check(self, interaction: discord.Interaction):
-        if interaction.user.id != self.owner_id:
+        if self.owner_id is not None and interaction.user.id != self.owner_id:
             await interaction.response.send_message("❌ ئەم Help Menu ـە بۆ کەسی دروستکراوە.", ephemeral=True)
             return False
         return True
@@ -285,6 +286,7 @@ class HMBHelpView(discord.ui.View):
                 label=f"{emoji} /{command.name}"[:80],
                 style=discord.ButtonStyle.primary if not required else discord.ButtonStyle.secondary,
                 row=index // 5,
+                custom_id=f"hmb:help:cmd:{command.name}",
             )
 
             async def callback(interaction, cmd=command):
@@ -309,9 +311,9 @@ class HMBHelpView(discord.ui.View):
             button.callback = callback
             self.add_item(button)
 
-        previous = discord.ui.Button(label="⬅️ پێشوو", style=discord.ButtonStyle.secondary, disabled=self.page <= 0, row=4)
-        next_button = discord.ui.Button(label="دواتر ➡️", style=discord.ButtonStyle.secondary, disabled=self.page >= self.total_pages - 1, row=4)
-        close = discord.ui.Button(label="✖️ داخستن", style=discord.ButtonStyle.danger, row=4)
+        previous = discord.ui.Button(label="⬅️ پێشوو", style=discord.ButtonStyle.secondary, disabled=self.page <= 0, row=4, custom_id=f"hmb:help:prev:{self.page}")
+        next_button = discord.ui.Button(label="دواتر ➡️", style=discord.ButtonStyle.secondary, disabled=self.page >= self.total_pages - 1, row=4, custom_id=f"hmb:help:next:{self.page}")
+        close = discord.ui.Button(label="✖️ داخستن", style=discord.ButtonStyle.danger, row=4, custom_id=f"hmb:help:close:{self.page}")
 
         async def previous_callback(interaction):
             self.page -= 1
@@ -333,6 +335,17 @@ class HMBHelpView(discord.ui.View):
         self.add_item(previous)
         self.add_item(next_button)
         self.add_item(close)
+
+def register_persistent_help_views(bot):
+    if getattr(bot, "_hmb_help_views_registered", False):
+        return
+    commands_list = _all_help_commands(bot)
+    page_size = 20
+    total_pages = max(1, (len(commands_list) + page_size - 1) // page_size)
+    for page in range(total_pages):
+        bot.add_view(HMBHelpView(bot, owner_id=None, page=page, persistent=True))
+    bot._hmb_help_views_registered = True
+
 
 def setup_features(bot):
     # setup_hook should be safe if invoked more than once.

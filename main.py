@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 
 from moderation import setup_moderation
-from features import setup_features
+from features import setup_features, register_persistent_help_views
 from music import MusicManager, setup_music_commands
 from extras import setup_extra_commands
 from storage import Store
@@ -612,6 +612,9 @@ class HMBGlobal(commands.Bot):
         setup_music_commands(self)
 
         setup_extra_commands(self)
+
+        # Restore Help button handlers after Railway restarts.
+        register_persistent_help_views(self)
 
         # Register $ commands
         _register_prefix_commands(self)
