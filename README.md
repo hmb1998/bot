@@ -1,32 +1,31 @@
-# HMB GLOBAL — Python Only
+# HMB_GLOBAL — final no-cookie YouTube/Spotify fix
 
-This edition contains the Discord bot runtime and command implementations in Python.
-There is no Node.js, npm, discord.js, HTML, or JSON command/config source.
+The Railway logs show the remaining failure is YouTube's datacenter bot check:
+`Sign in to confirm you're not a bot`.
 
-## Run
-Set `TOKEN` in Railway Variables, then start with:
+The previous deployment did not actually run the bgutil POT server, and the
+current `music.py` still selects `default/web_safari/android_vr`. This bundle
+fixes the deployment layer without requiring `YOUTUBE_COOKIES_B64`.
 
-```text
-python main.py
-```
+## Upload/replace these 3 files in the repo
 
-Optional variables: `OWNER_ID`, `PREFIX` (default `$`), `REGISTER_COMMANDS` (default `false`), `PORT`.
+- `requirements.txt`
+- `railpack.json`
+- `sitecustomize.py`
 
-`REGISTER_COMMANDS=false` avoids Discord global-command rate limits during frequent Railway restarts. Use the `$refresh` command (administrator) to copy/sync all slash commands to the current server, or set `REGISTER_COMMANDS=true` only when you specifically need a global sync.
+Then redeploy Railway.
 
-The bot stores settings, warnings, and XP in `hmb.sqlite3` using Python's built-in `sqlite3`.
-FFmpeg, PyNaCl, and davey are required for music/voice playback and are installed by the included Dockerfile and requirements.
+### What happens after deploy
 
-## Commands
-Moderation, anti-spam/link protection, tickets, warnings, XP/rank, polls, giveaways, music,
-server/user tools, and utility commands are implemented in Python modules.
+Railpack installs Python 3.12 + Node 22, builds the bgutil provider, installs
+the Python yt-dlp plugin, starts the provider on `127.0.0.1:4416`, and only
+then starts `python main.py`.
 
+`sitecustomize.py` changes yt-dlp's clients to start with `mweb` and connects
+the bgutil provider automatically.
 
-## Slash + Prefix control
-- Slash commands use `/command`.
-- Prefix aliases use `$command` (or the value of `PREFIX`).
-- `REGISTER_COMMANDS=false` is the safe Railway default and prevents global sync on every restart.
-- After the bot is online, run `$sync` once in your Discord server as an Administrator. This registers the slash commands to that server immediately.
-- `$syncglobal` is OWNER_ID-only and should only be used when a global sync is actually needed.
-- Music supports YouTube, Spotify (resolved through spotDL), TikTok/other yt-dlp-supported URLs, queue controls, shuffle, skip, volume, loop, now playing, and clear/remove queue.
-- Anti-spam is enabled by default for new servers; administrators can use `/antispam` or `$antispam` to change it.
+Do NOT add `YOUTUBE_COOKIES_B64` for this fix.
+
+The provider is not a guaranteed bypass for every YouTube block, but it is the
+current recommended approach in yt-dlp's PO-token guide for clients requiring
+PO tokens.
